@@ -29,7 +29,7 @@ void	free_capi_device	(struct class_device* cd);
 static ssize_t
 show_manufacturer(struct class_device* cd, char* buf)
 {
-	return sprintf(buf, "%s", to_capi_device(cd)->manufacturer);
+	return snprintf(buf, CAPI_MANUFACTURER_LEN, "%s", to_capi_device(cd)->manufacturer);
 }
 CLASS_DEVICE_ATTR(manufacturer, S_IRUGO, show_manufacturer, NULL);
 
@@ -47,7 +47,7 @@ show_version(struct class_device* cd, char* buf)
 {
 	struct capi_version* v = &to_capi_device(cd)->version;
 
-	return sprintf(buf, "%d.%d.%d.%d", v->majorversion, v->minorversion, v->majormanuversion, v->minormanuversion);
+	return sprintf(buf, "%d.%d", v->majormanuversion, v->minormanuversion);
 }
 CLASS_DEVICE_ATTR(version, S_IRUGO, show_version, NULL);
 
