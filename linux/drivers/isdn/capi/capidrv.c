@@ -25,8 +25,8 @@
 #include <linux/isdn.h>
 #include <linux/isdnif.h>
 #include <linux/proc_fs.h>
-#include <linux/capi.h>
-#include <linux/kernelcapi.h>
+#include <linux/isdn/capiappl.h>
+#include <linux/isdn/capidevice.h>
 #include <linux/ctype.h>
 #include <linux/init.h>
 
@@ -125,7 +125,7 @@ struct capidrv_contr {
 
 
 struct capidrv_data {
-	struct capi20_appl ap;
+	struct capi_appl ap;
 	int ncontr;
 	struct capidrv_contr *contr_list;
 };
@@ -512,7 +512,7 @@ static void send_message(capidrv_contr * card, _cmsg * cmsg)
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
 	memcpy(skb_put(skb, len), cmsg->buf, len);
-	capi20_put_message(&global.ap, skb);
+	(void) capi_put_message(&global.ap, skb);
 }
 
 /* -------- state machine -------------------------------------------- */
@@ -659,7 +659,7 @@ static void n0(capidrv_contr * card, capidrv_ncci * ncci)
 	isdn_ctrl cmd;
 
 	capi_fill_DISCONNECT_REQ(&cmsg,
-				 global.ap.applid,
+				 global.ap.id,
 				 card->msgid++,
 				 ncci->plcip->plci,
 				 NULL,	/* BChannelinformation */
@@ -947,7 +947,7 @@ static void handle_incoming_call(capidrv_contr * card, _cmsg * cmsg)
 				cmd.parm.setup.si2,
 				cmd.parm.setup.eazmsn);
 			capi_fill_ALERT_REQ(cmsg,
-					    global.ap.applid,
+					    global.ap.id,
 					    card->msgid++,
 					    plcip->plci,	/* adr */
 					    NULL,/* BChannelinformation */
@@ -1087,7 +1087,7 @@ static void handle_plci(_cmsg * cmsg)
 				break;	/* $$$$ */
 			}
 			capi_fill_CONNECT_B3_REQ(cmsg,
-						 global.ap.applid,
+						 global.ap.id,
 						 card->msgid++,
 						 plcip->plci,	/* adr */
 						 NULL	/* NCPI */
@@ -1204,7 +1204,7 @@ static void handle_ncci(_cmsg * cmsg)
 			if (nccip) {
 				ncci_change_state(card, nccip, EV_NCCI_CONNECT_B3_IND);
 				capi_fill_CONNECT_B3_RESP(cmsg,
-							  global.ap.applid,
+							  global.ap.id,
 							  card->msgid++,
 							  nccip->ncci,	/* adr */
 							  0,	/* Reject */
@@ -1222,7 +1222,7 @@ static void handle_ncci(_cmsg * cmsg)
 			       cmsg->adr.adrNCCI);
 		}
 		capi_fill_CONNECT_B3_RESP(cmsg,
-					  global.ap.applid,
+					  global.ap.id,
 					  card->msgid++,
 					  cmsg->adr.adrNCCI,
 					  2,	/* Reject */
@@ -1369,30 +1369,45 @@ static void handle_data(_cmsg * cmsg, struct sk_buff *skb)
 
 static _cmsg s_cmsg;
 
-static void capidrv_recv_message(struct capi20_appl *ap, struct sk_buff *skb)
+static void capidrv_recv_message(unsigned long data)
 {
-	capi_message2cmsg(&s_cmsg, skb->data);
-	if (debugmode > 3)
-		printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
-		       ap->applid, capi_cmsg2str(&s_cmsg));
-	
-	if (s_cmsg.Command == CAPI_DATA_B3
-	    && s_cmsg.Subcommand == CAPI_IND) {
-		handle_data(&s_cmsg, skb);
-		return;
+	struct sk_buff* skb;
+	capinfo_0x11 info;
+
+	while ((info = capi_get_message(&global.ap, &skb)) == CAPINFO_0X11_NOERR) {
+		capi_message2cmsg(&s_cmsg, skb->data);
+		if (debugmode > 3)
+			printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
+			       global.ap.id, capi_cmsg2str(&s_cmsg));
+
+		if (s_cmsg.Command == CAPI_DATA_B3
+		    && s_cmsg.Subcommand == CAPI_IND) {
+			handle_data(&s_cmsg, skb);
+			continue;
+		}
+		if ((s_cmsg.adr.adrController & 0xffffff00) == 0)
+			handle_controller(&s_cmsg);
+		else if ((s_cmsg.adr.adrPLCI & 0xffff0000) == 0)
+			handle_plci(&s_cmsg);
+		else
+			handle_ncci(&s_cmsg);
+		/*
+		 * data of skb used in s_cmsg,
+		 * free data when s_cmsg is not used again
+		 * thanks to Lars Heete <hel@admin.de>
+		 */
+		kfree_skb(skb);
 	}
-	if ((s_cmsg.adr.adrController & 0xffffff00) == 0)
-		handle_controller(&s_cmsg);
-	else if ((s_cmsg.adr.adrPLCI & 0xffff0000) == 0)
-		handle_plci(&s_cmsg);
-	else
-		handle_ncci(&s_cmsg);
-	/*
-	 * data of skb used in s_cmsg,
-	 * free data when s_cmsg is not used again
-	 * thanks to Lars Heete <hel@admin.de>
-	 */
-	kfree_skb(skb);
+
+	if (unlikely(info != CAPINFO_0X11_QUEUEEMPTY))
+		printk(KERN_WARNING "capidrv_signal: unexpected error encountered (info: %#x)\n", info);
+}
+
+DECLARE_TASKLET(capidrv_tasklet, capidrv_recv_message, 0);
+
+static void capidrv_signal(struct capi_appl* appl, unsigned long param)
+{
+	tasklet_schedule(&capidrv_tasklet);
 }
 
 /* ------------------------------------------------------------------- */
@@ -1618,7 +1633,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 			}
 
 			capi_fill_CONNECT_REQ(&cmdcmsg,
-					      global.ap.applid,
+					      global.ap.id,
 					      card->msgid++,
 					      card->contrnr,	/* adr */
 					  si2cip(bchan->si1, bchan->si2),	/* cipvalue */
@@ -1664,7 +1679,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 			       c->arg, bchan->l2, bchan->l3);
 
 		capi_fill_CONNECT_RESP(&cmdcmsg,
-				       global.ap.applid,
+				       global.ap.id,
 				       card->msgid++,
 				       bchan->plcip->plci,	/* adr */
 				       0,	/* Reject */
@@ -1711,7 +1726,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 		if (bchan->nccip) {
 			bchan->disconnecting = 1;
 			capi_fill_DISCONNECT_B3_REQ(&cmdcmsg,
-						    global.ap.applid,
+						    global.ap.id,
 						    card->msgid++,
 						    bchan->nccip->ncci,
 						    NULL	/* NCPI */
@@ -1732,7 +1747,7 @@ static int capidrv_command(isdn_ctrl * c, capidrv_contr * card)
 			} else if (bchan->plcip->plci) {
 				bchan->disconnecting = 1;
 				capi_fill_DISCONNECT_REQ(&cmdcmsg,
-							 global.ap.applid,
+							 global.ap.id,
 							 card->msgid++,
 						      bchan->plcip->plci,
 							 NULL,	/* BChannelinformation */
@@ -1821,7 +1836,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 	capidrv_ncci *nccip;
 	int len = skb->len;
 	int msglen;
-	u16 errcode;
+	capinfo_0x11 errcode;
 	u16 datahandle;
 
 	if (!card) {
@@ -1840,7 +1855,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		return 0;
 	}
 	datahandle = nccip->datahandle;
-	capi_fill_DATA_B3_REQ(&sendcmsg, global.ap.applid, card->msgid++,
+	capi_fill_DATA_B3_REQ(&sendcmsg, global.ap.id, card->msgid++,
 			      nccip->ncci,	/* adr */
 			      (u32) skb->data,	/* Data */
 			      skb->len,		/* DataLength */
@@ -1864,8 +1879,8 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		printk(KERN_DEBUG "capidrv-%d: only %d bytes headroom, need %d\n",
 		       card->contrnr, skb_headroom(skb), msglen);
 		memcpy(skb_push(nskb, msglen), sendcmsg.buf, msglen);
-		errcode = capi20_put_message(&global.ap, nskb);
-		if (errcode == CAPI_NOERROR) {
+		errcode = capi_put_message(&global.ap, nskb);
+		if (errcode == CAPINFO_0X11_NOERR) {
 			dev_kfree_skb(skb);
 			nccip->datahandle++;
 			return len;
@@ -1875,11 +1890,11 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 				card->contrnr, errcode, capi_info2str(errcode));
 	        (void)capidrv_del_ack(nccip, datahandle);
 	        dev_kfree_skb(nskb);
-		return errcode == CAPI_SENDQUEUEFULL ? 0 : -1;
+		return errcode == CAPINFO_0X11_QUEUEFULL ? 0 : -1;
 	} else {
 		memcpy(skb_push(skb, msglen), sendcmsg.buf, msglen);
-		errcode = capi20_put_message(&global.ap, skb);
-		if (errcode == CAPI_NOERROR) {
+		errcode = capi_put_message(&global.ap, skb);
+		if (errcode == CAPINFO_0X11_NOERR) {
 			nccip->datahandle++;
 			return len;
 		}
@@ -1888,7 +1903,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 				card->contrnr, errcode, capi_info2str(errcode));
 		skb_pull(skb, msglen);
 	        (void)capidrv_del_ack(nccip, datahandle);
-		return errcode == CAPI_SENDQUEUEFULL ? 0 : -1;
+		return errcode == CAPINFO_0X11_QUEUEFULL ? 0 : -1;
 	}
 }
 
@@ -1918,13 +1933,11 @@ static void enable_dchannel_trace(capidrv_contr *card)
         u8 manufacturer[CAPI_MANUFACTURER_LEN];
         capi_version version;
 	u16 contr = card->contrnr;
-	u16 errcode;
 	u16 avmversion[3];
 
-        errcode = capi20_get_manufacturer(contr, manufacturer);
-        if (errcode != CAPI_NOERROR) {
-	   printk(KERN_ERR "%s: can't get manufacturer (0x%x)\n",
-			card->name, errcode);
+        if (!capi_get_manufacturer(contr, manufacturer)) {
+	   printk(KERN_ERR "%s: can't get manufacturer\n",
+			card->name);
 	   return;
 	}
 	if (strstr(manufacturer, "AVM") == 0) {
@@ -1932,10 +1945,9 @@ static void enable_dchannel_trace(capidrv_contr *card)
 			card->name, manufacturer);
 	   return;
 	}
-        errcode = capi20_get_version(contr, &version);
-        if (errcode != CAPI_NOERROR) {
-	   printk(KERN_ERR "%s: can't get version (0x%x)\n",
-			card->name, errcode);
+        if (!capi_get_version(contr, &version)) {
+	   printk(KERN_ERR "%s: can't get version\n",
+			card->name);
 	   return;
 	}
 	avmversion[0] = (version.majormanuversion >> 4) & 0x0f;
@@ -1945,7 +1957,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 
         if (avmversion[0] > 3 || (avmversion[0] == 3 && avmversion[1] > 5)) {
 		printk(KERN_INFO "%s: D2 trace enabled\n", card->name);
-		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.ap.applid,
+		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.ap.id,
 					   card->msgid++,
 					   contr,
 					   0x214D5641,  /* ManuID */
@@ -1954,7 +1966,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 					   (_cstruct)"\004\200\014\000\000");
 	} else {
 		printk(KERN_INFO "%s: D3 trace enabled\n", card->name);
-		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.ap.applid,
+		capi_fill_MANUFACTURER_REQ(&cmdcmsg, global.ap.id,
 					   card->msgid++,
 					   contr,
 					   0x214D5641,  /* ManuID */
@@ -1968,7 +1980,7 @@ static void enable_dchannel_trace(capidrv_contr *card)
 
 static void send_listen(capidrv_contr *card)
 {
-	capi_fill_LISTEN_REQ(&cmdcmsg, global.ap.applid,
+	capi_fill_LISTEN_REQ(&cmdcmsg, global.ap.id,
 			     card->msgid++,
 			     card->contrnr, /* controller */
 			     1 << 6,	/* Infomask */
@@ -2002,7 +2014,7 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 		printk(KERN_WARNING "capidrv: (%s) Could not reserve module\n", id);
 		return -1;
 	}
-	if (!(card = (capidrv_contr *) kmalloc(sizeof(capidrv_contr), GFP_ATOMIC))) {
+	if (!(card = (capidrv_contr *) kmalloc(sizeof(capidrv_contr), GFP_KERNEL))) {
 		printk(KERN_WARNING
 		 "capidrv: (%s) Could not allocate contr-struct.\n", id);
 		return -1;
@@ -2013,7 +2025,7 @@ static int capidrv_addcontr(u16 contr, struct capi_profile *profp)
 	strcpy(card->name, id);
 	card->contrnr = contr;
 	card->nbchan = profp->nbchannel;
-	card->bchans = (capidrv_bchan *) kmalloc(sizeof(capidrv_bchan) * card->nbchan, GFP_ATOMIC);
+	card->bchans = (capidrv_bchan *) kmalloc(sizeof(capidrv_bchan) * card->nbchan, GFP_KERNEL);
 	if (!card->bchans) {
 		printk(KERN_WARNING
 		"capidrv: (%s) Could not allocate bchan-structs.\n", id);
@@ -2169,20 +2181,24 @@ static int capidrv_delcontr(u16 contr)
 	return 0;
 }
 
-
-static void lower_callback(unsigned int cmd, u32 contr, void *data)
+static int
+capidrv_add(struct class_device* cd)
 {
+	struct capi_device* dev = to_capi_device(cd);
 
-	switch (cmd) {
-	case KCI_CONTRUP:
-		printk(KERN_INFO "capidrv: controller %hu up\n", contr);
-		(void) capidrv_addcontr(contr, (capi_profile *) data);
-		break;
-	case KCI_CONTRDOWN:
-		printk(KERN_INFO "capidrv: controller %hu down\n", contr);
-		(void) capidrv_delcontr(contr);
-		break;
-	}
+	printk(KERN_INFO "capidrv: controller %hu up\n", dev->id);
+	(void) capidrv_addcontr(dev->id, &dev->profile);
+
+	return 0;
+}
+
+static void
+capidrv_remove(struct class_device* cd)
+{
+	struct capi_device* dev = to_capi_device(cd);
+
+	printk(KERN_INFO "capidrv: controller %hu down\n", dev->id);
+	(void) capidrv_delcontr(dev->id);
 }
 
 /*
@@ -2195,10 +2211,10 @@ static int proc_capidrv_read_proc(char *page, char **start, off_t off,
 	int len = 0;
 
 	len += sprintf(page+len, "%lu %lu %lu %lu\n",
-			global.ap.nrecvctlpkt,
-			global.ap.nrecvdatapkt,
-			global.ap.nsentctlpkt,
-			global.ap.nsentdatapkt);
+			global.ap.stats.rx_packets - global.ap.stats.rx_data_packets,
+			global.ap.stats.rx_data_packets,
+			global.ap.stats.tx_packets - global.ap.stats.tx_data_packets,
+		        global.ap.stats.tx_data_packets);
 	if (off+count >= len)
 	   *eof = 1;
 	if (len < off)
@@ -2244,13 +2260,18 @@ static void __exit proc_exit(void)
     }
 }
 
+static struct class_interface capidrv_class_iface = {
+	.class	= &capi_class,
+	.add	= capidrv_add,
+	.remove	= capidrv_remove
+};
+
 static int __init capidrv_init(void)
 {
-	capi_profile profile;
 	char rev[32];
 	char *p;
-	u32 ncontr, contr;
 	u16 errcode;
+	int err;
 
 	if ((p = strchr(revision, ':')) != 0 && p[1]) {
 		strncpy(rev, p + 2, sizeof(rev));
@@ -2260,31 +2281,23 @@ static int __init capidrv_init(void)
 	} else
 		strcpy(rev, "1.0");
 
-	global.ap.rparam.level3cnt = -2;  /* number of bchannels twice */
-	global.ap.rparam.datablkcnt = 16;
-	global.ap.rparam.datablklen = 2048;
+	global.ap.params.level3cnt = -2;  /* number of bchannels twice */
+	global.ap.params.datablkcnt = 16;
+	global.ap.params.datablklen = 2048;
 
-	global.ap.recv_message = capidrv_recv_message;
-	errcode = capi20_register(&global.ap);
+	capi_set_signal(&global.ap, capidrv_signal, 0);
+	errcode = capi_register(&global.ap);
 	if (errcode) {
+		printk(KERN_ERR "capidrv: can't register appl (info: %#x)\n", errcode);
 		return -EIO;
 	}
 
-	capi20_set_callback(&global.ap, lower_callback);
-
-	errcode = capi20_get_profile(0, &profile);
-	if (errcode != CAPI_NOERROR) {
-		capi20_release(&global.ap);
-		return -EIO;
+	err = class_interface_register(&capidrv_class_iface);
+	if (err) {
+		(void) capi_release(&global.ap);
+		return err;
 	}
 
-	ncontr = profile.ncontroller;
-	for (contr = 1; contr <= ncontr; contr++) {
-		errcode = capi20_get_profile(contr, &profile);
-		if (errcode != CAPI_NOERROR)
-			continue;
-		(void) capidrv_addcontr(contr, &profile);
-	}
 	proc_init();
 
 	printk(KERN_NOTICE "capidrv: Rev %s: loaded\n", rev);
@@ -2304,7 +2317,9 @@ static void __exit capidrv_exit(void)
 		strcpy(rev, " ??? ");
 	}
 
-	capi20_release(&global.ap);
+	class_interface_unregister(&capidrv_class_iface);
+	(void) capi_release(&global.ap);
+	tasklet_kill(&capidrv_tasklet);
 
 	proc_exit();
 
