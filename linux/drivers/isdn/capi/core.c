@@ -94,7 +94,7 @@ register_capi_appl(struct capi_appl* appl, struct capi_device* dev)
 {
 	capinfo_0x11 info = dev->drv->capi_register(dev, appl);
 	if (unlikely(info)) {
-		printk(KERN_NOTICE "capi: appl %d couldn't be registered with device %d (info: %#x).\n", appl->id, dev->id, info);
+		printk(KERN_NOTICE "capicore: appl %d couldn't be registered with device %d (info: %#x).\n", appl->id, dev->id, info);
 		return;
 	}
 
@@ -157,6 +157,8 @@ capi_device_register(struct capi_device* dev)
 	res = capi_device_register_sysfs(dev);
 	if (unlikely(res))
 		unregister_capi_device(dev);
+	else
+		pr_info("capicore: registered new device %d\n", dev->id);
 
 	return res;
 }
@@ -167,6 +169,8 @@ capi_device_unregister(struct capi_device* dev)
 {
 	unregister_capi_device(dev);
 	class_device_del(&dev->class_dev);
+
+	pr_info("capicore: unregistered device %d\n", dev->id);
 }
 
 
@@ -386,7 +390,7 @@ capi_get_serial_number(int id, u8 serial[CAPI_SERIAL_LEN])
 struct capi_version*
 capi_get_version(int id, struct capi_version* version)
 {
-	static struct capi_version capicore_version = { 2, 0, 0, 1 };
+	static struct capi_version capicore_version = { 2, 0, 0, 0 };
 
 	if (id) {
 		struct capi_device* dev = try_get_capi_device_by_id(id);
@@ -446,7 +450,11 @@ capicore_init(void)
 	if (res)
 		return res;
 
-	return class_register(&capi_class);
+	res = class_register(&capi_class);
+	if (!res)
+		pr_info("capicore: $Revision$\n");
+
+	return res;
 }
 
 
@@ -457,6 +465,8 @@ capicore_exit(void)
 
 	class_unregister(&capi_class);
 	capi_unregister_proc();
+
+	pr_info("capicore: unloaded\n");
 }
 
 
