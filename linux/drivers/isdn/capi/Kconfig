@@ -13,7 +13,7 @@ config CAPI_MAX_DEVS
 
 config CAPI_MAX_APPLS
 	int "Maximum number of CAPI applications"
-	range 32 65535
+	range 8 65535
 	default "64"
 	depends on ISDN_CAPI
 	help
