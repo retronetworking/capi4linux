@@ -6,7 +6,7 @@
 
 The capicore provides an infrastructure for the communication between CAPI
 drivers and CAPI applications.  This document describes the interface at the
-driver layer.  See capidevice.h and capiappl.h in include/linux/isnd/ for the
+driver layer.  See capidevice.h and capiappl.h in include/linux/isdn/ for the
 declarations of the various functions and types used.
 
 The service that drivers provide to the capicore is the sending and receiving
