@@ -83,11 +83,11 @@ static int
 applparams_show(struct seq_file* seq, void* v)
 {
 	if (v == SEQ_START_TOKEN)
-		seq_puts(seq, "id   : logConns dataPackets dataLen\n");
+		seq_puts(seq, "id   : log_conns data_packets data_len\n");
 	else {
 		const struct capi_appl* a = v;
 
-		seq_printf(seq, "%-5u: %-8d %-11d %-7d\n",
+		seq_printf(seq, "%-5u: %-9d %-12d %-8d\n",
 			   a->id,
 			   a->params.level3cnt,
 			   a->params.datablkcnt,
@@ -129,20 +129,16 @@ static int
 applstats_show(struct seq_file* seq, void* v)
 {
 	if (v == SEQ_START_TOKEN)
-		seq_puts(seq, "id   : txPackets txBytes txDataPackets txDataBytes | rxPackets rxBytes rxDataPackets rxDataBytes rxQueue\n");
+		seq_puts(seq, "id   : tx_packets tx_bytes | rx_packets rx_bytes rx_queue_len\n");
 	else {
 		const struct capi_appl* a = v;
 
-		seq_printf(seq, "%-5u: %-9lu %-7lu %-13lu %-11lu | %-9lu %-7lu %-13lu %-11lu %-7u\n",
+		seq_printf(seq, "%-5u: %-10lu %-8lu | %-10lu %-8lu %-8u\n",
 			   a->id,
 			   a->stats.tx_packets,
 			   a->stats.tx_bytes,
-			   a->stats.tx_data_packets,
-			   a->stats.tx_data_bytes,
 			   a->stats.rx_packets,
 			   a->stats.rx_bytes,
-			   a->stats.rx_data_packets,
-			   a->stats.rx_data_bytes,
 			   skb_queue_len(&a->msg_queue));
 	}
 

@@ -84,10 +84,6 @@ STAT_ENTRY(rx_bytes);
 STAT_ENTRY(tx_bytes);
 STAT_ENTRY(rx_packets);
 STAT_ENTRY(tx_packets);
-STAT_ENTRY(rx_data_bytes);
-STAT_ENTRY(tx_data_bytes);
-STAT_ENTRY(rx_data_packets);
-STAT_ENTRY(tx_data_packets);
 
 
 static struct attribute* stats_attrs[] = {
@@ -95,10 +91,6 @@ static struct attribute* stats_attrs[] = {
 	&class_device_attr_tx_bytes.attr,
 	&class_device_attr_rx_packets.attr,
 	&class_device_attr_tx_packets.attr,
-	&class_device_attr_rx_data_bytes.attr,
-	&class_device_attr_tx_data_bytes.attr,
-	&class_device_attr_rx_data_packets.attr,
-	&class_device_attr_tx_data_packets.attr,
 	NULL
 };
 

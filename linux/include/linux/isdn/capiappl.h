@@ -39,21 +39,11 @@ struct capi_appl;
 struct capi_stats {
 	spinlock_t		lock;
 
-	/* Total number of received/transmitted bytes. */
 	unsigned long		rx_bytes;
 	unsigned long		tx_bytes;
 
-	/* Total number of received/transmitted packets. */
 	unsigned long		rx_packets;
 	unsigned long		tx_packets;
-
-	/* Number of received/transmitted payload bytes. */
-	unsigned long		rx_data_bytes;
-	unsigned long		tx_data_bytes;
-
-	/* Number of received/transmitted DATA_B3 packets. */
-	unsigned long		rx_data_packets;
-	unsigned long		tx_data_packets;
 };
 
 
@@ -105,10 +95,10 @@ capinfo_0x11	capi_get_message	(struct capi_appl* appl, struct sk_buff** msg);
 capinfo_0x11	capi_peek_message	(struct capi_appl* appl);
 capinfo_0x11	capi_isinstalled	(void);
 
-u8*			capi_get_manufacturer	(int dev, u8 manufacturer[CAPI_MANUFACTURER_LEN]);
-u8*			capi_get_serial_number	(int dev, u8 serial[CAPI_SERIAL_LEN]);
-struct capi_version*	capi_get_version	(int dev, struct capi_version* version);
-capinfo_0x11		capi_get_profile	(int dev, struct capi_profile* profile);
+u8*			capi_get_manufacturer	(int id, u8 manufacturer[CAPI_MANUFACTURER_LEN]);
+u8*			capi_get_serial_number	(int id, u8 serial[CAPI_SERIAL_LEN]);
+struct capi_version*	capi_get_version	(int id, struct capi_version* version);
+capinfo_0x11		capi_get_profile	(int id, struct capi_profile* profile);
 u8*			capi_get_product	(int id, u8 product[CAPI_PRODUCT_LEN]);
 #endif	/* __KERNEL__ */
 
