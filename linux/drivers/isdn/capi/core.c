@@ -71,7 +71,7 @@ free_capi_device(struct class_device* cd)
 
 
 static inline int
-alloc_capi_device_id(struct capi_device* dev)
+add_capi_device(struct capi_device* dev)
 {
 	int i;
 
@@ -109,9 +109,6 @@ bind_capi_device(struct capi_device* dev)
 	struct capi_appl* appl;
 
 	down_write(&capi_devs_list_sem);
-	list_add_tail(&dev->entry, &capi_devs_list);
-
-	down(&capi_appls_list_sem);
 	list_for_each_entry(appl, &capi_appls_list, entry)
 		register_capi_appl(appl, dev);
 
@@ -120,7 +117,7 @@ bind_capi_device(struct capi_device* dev)
 	up_write(&dev->sem);
 	preempt_enable();
 
-	up(&capi_appls_list_sem);
+	list_add_tail(&dev->entry, &capi_devs_list);
 	up_write(&capi_devs_list_sem);
 }
 
@@ -129,7 +126,7 @@ void
 unregister_capi_device(struct capi_device* dev)
 {
 	down_write(&capi_devs_list_sem);
-	list_del(&dev->entry);
+	list_del_init(&dev->entry);
 	up_write(&capi_devs_list_sem);
 
 	down_write(&dev->sem);
@@ -152,7 +149,7 @@ capi_device_register(struct capi_device* dev)
 
 	spin_lock_init(&dev->stats.lock);
 
-	if (unlikely(!alloc_capi_device_id(dev)))
+	if (unlikely(!add_capi_device(dev)))
 		return -EMFILE;
 
 	bind_capi_device(dev);
@@ -173,54 +170,43 @@ capi_device_unregister(struct capi_device* dev)
 }
 
 
-static unsigned long __capi_appl_ids[BITS_TO_LONGS(CAPI_MAX_APPLS)];
-static spinlock_t __capi_appl_ids_lock = SPIN_LOCK_UNLOCKED;
-
-
 static inline int
-alloc_capi_appl_id(struct capi_appl* appl)
+add_capi_appl(struct capi_appl* appl)
 {
-	int i;
+	struct capi_appl* a;
+	u16 id = 1;
 
-	appl->id = 0;
-
-	spin_lock(__capi_appl_ids_lock);
-	i = find_first_zero_bit(__capi_appl_ids, CAPI_MAX_APPLS);
-	if (likely(i < CAPI_MAX_APPLS)) {
-		__set_bit(i, __capi_appl_ids);
-		appl->id = i + 1;
+	down(&capi_appls_list_sem);
+	list_for_each_entry(a, &capi_appls_list, entry) {
+		if (a->id > id)
+			break;
+		id++;
 	}
-	spin_unlock(__capi_appl_ids_lock);
+
+	if (unlikely(id > CAPI_MAX_APPLS))
+		appl->id = 0;
+	else {
+		appl->id = id;
+		list_add_tail(&appl->entry, &a->entry);
+	}
+	up(&capi_appls_list_sem);
 
 	return appl->id;
 }
 
 
-static inline void
-release_capi_appl_id(struct capi_appl* appl)
-{
-	clear_bit(appl->id - 1, __capi_appl_ids);
-}
-
-
-static inline void
+static inline int
 bind_capi_appl(struct capi_appl* appl)
 {
 	struct capi_device* dev;
-	struct capi_appl* a ;
 
 	down_read(&capi_devs_list_sem);
-	list_for_each_entry(dev, &capi_devs_list, entry)
-		register_capi_appl(appl, dev);
-
-	down(&capi_appls_list_sem);
-	list_for_each_entry(a, &capi_appls_list, entry)
-		if (a->id > appl->id)
-			break;
-	list_add_tail(&appl->entry, &a->entry);
-	up(&capi_appls_list_sem);
-
+	if (likely(add_capi_appl(appl)))
+		list_for_each_entry(dev, &capi_devs_list, entry)
+			register_capi_appl(appl, dev);
 	up_read(&capi_devs_list_sem);
+
+	return appl->id;
 }
 
 
@@ -233,9 +219,6 @@ capi_register(struct capi_appl* appl)
 	if (unlikely(appl->params.datablklen < 128))
 		return CAPINFO_0X10_LOGBLKSIZETOSMALL;
 
-	if (unlikely(!alloc_capi_appl_id(appl)))
-		return CAPINFO_0X10_TOOMANYAPPLS;
-
 	skb_queue_head_init(&appl->msg_queue);
 	appl->info = CAPINFO_0X11_NOERR;
 
@@ -244,9 +227,17 @@ capi_register(struct capi_appl* appl)
 
 	memset(&appl->devs, 0, sizeof appl->devs);
 
-	bind_capi_appl(appl);
+	if (unlikely(!bind_capi_appl(appl)))
+		return CAPINFO_0X10_TOOMANYAPPLS;
 
 	return CAPINFO_0X10_NOERR;
+}
+
+
+static inline int
+capi_device_listed(struct capi_device* dev)
+{
+	return !list_empty(&dev->entry);
 }
 
 
@@ -256,22 +247,23 @@ capi_release(struct capi_appl* appl)
 	struct capi_device* dev;
 	int i;
 
+	down_read(&capi_devs_list_sem);
+	for (i = 0; (i = find_next_bit(appl->devs, CAPI_MAX_DEVS, i)) < CAPI_MAX_DEVS; i++) {
+		dev = capi_devs_table[i];
+		BUG_ON(!dev);
+
+		if (likely(capi_device_listed(dev)))
+			dev->drv->capi_release(dev, appl);
+
+		capi_device_put(dev);
+	}
+
 	down(&capi_appls_list_sem);
 	list_del(&appl->entry);
 	up(&capi_appls_list_sem);
 
-	for (i = 0; (i = find_next_bit(appl->devs, CAPI_MAX_DEVS, i)) < CAPI_MAX_DEVS; i++) {
-		dev = capi_devs_table[i];
-		BUG_ON(!dev);
-		if (likely(down_read_trylock(&dev->sem))) {
-			dev->drv->capi_release(dev, appl);
-			up_read(&dev->sem);
-		}
-		capi_device_put(dev);
-	}
-
 	skb_queue_purge(&appl->msg_queue);
-	release_capi_appl_id(appl);
+	up_read(&capi_devs_list_sem);
 
 	return appl->info;
 }
@@ -296,6 +288,7 @@ capi_put_message(struct capi_appl* appl, struct sk_buff* msg)
 
 	dev = capi_devs_table[id - 1];
 	BUG_ON(!dev);
+
 	if (unlikely(!down_read_trylock(&dev->sem)))
 		return CAPINFO_0X11_OSRESERR;
 	info = dev->drv->capi_put_message(dev, appl, msg);
