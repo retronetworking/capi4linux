@@ -74,6 +74,7 @@ struct capi_appl {
 	struct capi_stats	stats;
 
 	capi_register_params	params;
+	void*			data;
 
 	struct list_head	entry;
 };
