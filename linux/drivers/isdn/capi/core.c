@@ -28,8 +28,8 @@
 #include <linux/isdn/capicmd.h>
 
 
-struct capi_device* capi_devices_table[CAPI_MAX_DEVS];
-spinlock_t capi_devices_table_lock;
+static struct capi_device* capi_devices_table[CAPI_MAX_DEVS];
+static spinlock_t capi_devices_table_lock;
 atomic_t nr_capi_devices = ATOMIC_INIT(0);
 
 
@@ -102,8 +102,11 @@ free_capi_device(struct class_device* cd)
 {
 	struct capi_device* dev = to_capi_device(cd);
 
-	if (likely(dev->id))
+	if (likely(dev->id)) {
+		spin_lock(&capi_devices_table_lock);
 		capi_devices_table[dev->id - 1] = NULL;
+		spin_unlock(&capi_devices_table_lock);
+	}
 
 	kfree(dev);
 }
