@@ -502,4 +502,45 @@ static inline void capi_fill_RESET_B3_RESP(_cmsg * cmsg, __u16 ApplId, __u16 Mes
 	capi_cmsg_header(cmsg, ApplId, 0x87, 0x83, Messagenumber, adr);
 }
 
+typedef enum {
+	CapiMessageNotSupportedInCurrentState = 0x2001,
+	CapiIllContrPlciNcci                  = 0x2002,
+	CapiNoPlciAvailable                   = 0x2003,
+	CapiNoNcciAvailable                   = 0x2004,
+	CapiNoListenResourcesAvailable        = 0x2005,
+	CapiNoFaxResourcesAvailable           = 0x2006,
+	CapiIllMessageParmCoding              = 0x2007,
+} RESOURCE_CODING_PROBLEM;
+
+typedef enum {
+	CapiB1ProtocolNotSupported                      = 0x3001,
+	CapiB2ProtocolNotSupported                      = 0x3002,
+	CapiB3ProtocolNotSupported                      = 0x3003,
+	CapiB1ProtocolParameterNotSupported             = 0x3004,
+	CapiB2ProtocolParameterNotSupported             = 0x3005,
+	CapiB3ProtocolParameterNotSupported             = 0x3006,
+	CapiBProtocolCombinationNotSupported            = 0x3007,
+	CapiNcpiNotSupported                            = 0x3008,
+	CapiCipValueUnknown                             = 0x3009,
+	CapiFlagsNotSupported                           = 0x300a,
+	CapiFacilityNotSupported                        = 0x300b,
+	CapiDataLengthNotSupportedByCurrentProtocol     = 0x300c,
+	CapiResetProcedureNotSupportedByCurrentProtocol = 0x300d,
+	CapiTeiAssignmentFailed                         = 0x300e,
+} REQUESTED_SERVICES_PROBLEM;
+
+typedef enum {
+	CapiSuccess                                     = 0x0000,
+	CapiSupplementaryServiceNotSupported            = 0x300e,
+	CapiRequestNotAllowedInThisState                = 0x3010,
+} SUPPLEMENTARY_SERVICE_INFO;
+
+typedef enum {
+	CapiProtocolErrorLayer1                         = 0x3301,
+	CapiProtocolErrorLayer2                         = 0x3302,
+	CapiProtocolErrorLayer3                         = 0x3303,
+	CapiTimeOut                                     = 0x3303, // SuppServiceReason
+	CapiCallGivenToOtherApplication                 = 0x3304,
+} CAPI_REASON;
+
 #endif				/* __CAPIUTIL_H__ */
