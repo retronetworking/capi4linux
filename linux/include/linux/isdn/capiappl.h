@@ -97,56 +97,27 @@ typedef void	(*capi_signal_func)	(struct capi_appl* appl, unsigned long param);
 struct capi_appl {
 	u16			id;
 
-	capi_register_params	params;
-
-	void*			private_data;
-
 	capi_signal_func	sig;
 	unsigned long		sig_param;
 
 	struct sk_buff_head	msg_queue;
 
 	capinfo_0x11		info;
-	spinlock_t		info_lock;
-
-	struct capi_stats	stats;
 
 	unsigned long		devs[BITS_TO_LONGS(CAPI_MAX_DEVS)];
 
-	struct kref		refs;
+	struct capi_stats	stats;
+
+	capi_register_params	params;
 };
-
-
-static inline struct capi_appl*
-capi_appl_get(struct capi_appl* appl)
-{
-	if (appl)
-		kref_get(&appl->refs);
-
-	return appl;
-}
-
-
-static inline void
-capi_appl_put(struct capi_appl* appl)
-{
-	kref_put(&appl->refs);
-}
-
-
-struct capi_appl*	capi_appl_alloc		(void);
-
-
-static inline void
-capi_appl_free(struct capi_appl* appl)
-{
-	capi_appl_put(appl);
-}
 
 
 static inline void
 capi_set_signal(struct capi_appl* appl, capi_signal_func signal, unsigned long param)
 {
+	if (!appl)
+		return;
+
 	appl->sig = signal;
 	appl->sig_param = param;
 }

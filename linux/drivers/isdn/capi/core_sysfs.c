@@ -23,7 +23,7 @@
 #include <linux/isdn/capiutil.h>
 
 
-void	release_capi_device	(struct class_device* cd);
+void	free_capi_device	(struct class_device* cd);
 
 
 static ssize_t
@@ -63,7 +63,7 @@ static struct class_device_attribute* attrs[] = {
 static ssize_t
 read_profile(struct kobject* kobj, char* buf, loff_t pos, size_t size)
 {
-	extern int nr_capi_devices;
+	extern atomic_t nr_capi_devices;
 	const int CAPI_PROFILE_LEN = 64;
 	char b[CAPI_PROFILE_LEN];
 	struct capi_profile* p;
@@ -76,7 +76,7 @@ read_profile(struct kobject* kobj, char* buf, loff_t pos, size_t size)
 
 	p = &to_capi_device(container_of(kobj, struct class_device, kobj))->profile;
 
-	capimsg_setu16(b, 0, nr_capi_devices);
+	capimsg_setu16(b, 0, atomic_read(&nr_capi_devices));
 	capimsg_setu16(b, 2, p->nbchannel);
 	memcpy(b + 4, &p->goptions, 4);
 	memcpy(b + 8, &p->support1, 4);
@@ -141,7 +141,7 @@ static struct attribute_group stats_attrs_group = {
 
 struct class capi_class = {
 	.name		= "capi",
-	.release	= release_capi_device
+	.release	= free_capi_device
 };
 
 

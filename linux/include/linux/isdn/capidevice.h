@@ -29,6 +29,13 @@
 #include <linux/kref.h>
 
 
+#if 1
+#define CAPICOREDBG(format, arg...) do { printk(KERN_DEBUG "capicore: %s(): " format "\n", __FUNCTION__ , ## arg); } while (0)
+#else
+#define CAPICOREDBG(format, arg...)
+#endif
+
+
 struct capi_device;
 
 
@@ -38,13 +45,11 @@ struct capi_driver {
 	capinfo_0x10	(*capi_register)	(struct capi_device* dev, struct capi_appl* appl);
 	void		(*capi_release)		(struct capi_device* dev, struct capi_appl* appl);
 	capinfo_0x11	(*capi_put_message)	(struct capi_device* dev, struct capi_appl* appl, struct sk_buff* msg);
-
-	void 		(*release)		(struct capi_device* dev);
 };
 
 
 struct capi_device {
-	int			id;
+	unsigned short		id;
 
 	u8			manufacturer[CAPI_MANUFACTURER_LEN];
 	u8			serial[CAPI_SERIAL_LEN];
@@ -52,30 +57,43 @@ struct capi_device {
 	struct capi_profile	profile;
 
 	struct capi_driver*	drv;
-	struct kref		refs;
-
-	struct capi_stats	stats;
 
 	enum capi_device_state {
 		CAPI_DEVICE_STATE_RUNNING,
 		CAPI_DEVICE_STATE_ZOMBIE
-	};
-	enum capi_device_state	state;
+	}			state;
 	spinlock_t		state_lock;
 
+	struct kref		refs;
+	struct completion	done;
 	atomic_t		appls;
+
+	struct capi_stats	stats;
 
 	struct class_device	class_dev;
 };
 
 
 struct capi_device*	capi_device_alloc	(void);
+int			capi_device_register	(struct capi_device* dev);
+void			capi_device_unregister	(struct capi_device* dev);
+
+
+static inline struct capi_device*
+capi_device_get(struct capi_device* dev)
+{
+	if (unlikely(!dev))
+		return NULL;
+	
+	class_device_get(&dev->class_dev);
+
+	return dev;
+}
 
 
 static inline void
-capi_device_free(struct capi_device* dev)
+capi_device_put(struct capi_device* dev)
 {
-	BUG_ON(atomic_read(&dev->refs.refcount));
 	class_device_put(&dev->class_dev);
 }
 
@@ -95,14 +113,17 @@ capi_device_get_devdata(struct capi_device* dev)
 
 
 static inline void
-capi_device_set_device(struct capi_device* capi_dev, struct device* dev)
+capi_device_set_dev(struct capi_device* capi_dev, struct device* dev)
 {
 	capi_dev->class_dev.dev = dev;
 }
 
 
-int	capi_device_register	(struct capi_device* dev);
-void	capi_device_unregister	(struct capi_device* dev);
+static inline struct device*
+capi_device_get_dev(struct capi_device* capi_dev)
+{
+	return capi_dev->class_dev.dev;
+}
 
 
 static inline struct capi_device*
@@ -121,13 +142,18 @@ capi_appl_signal(struct capi_appl* appl)
 
 
 static inline void
-capi_appl_get_message(struct capi_appl* appl, struct sk_buff* msg)
+capi_appl_enqueue_message(struct capi_appl* appl, struct sk_buff* msg)
 {
 	skb_queue_tail(&appl->msg_queue, msg);
 }
 
 
-void	capi_appl_signal_info	(struct capi_appl* appl, capinfo_0x11 info);
+static inline void
+capi_appl_signal_error(struct capi_appl* appl, capinfo_0x11 info)
+{
+	appl->info = info;
+	capi_appl_signal(appl);
+}
 #endif	/* __KERNEL__ */
 
 
