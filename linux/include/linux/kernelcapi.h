@@ -37,7 +37,7 @@ struct capi_interface {
 	u16	(*capi_get_message)	(u16 applid, struct sk_buff** msg);
 	u16	(*capi_set_signal)	(u16 applid,
 
-					 /* Called from interrupt context. */
+					 /* Called from hardware interrupt context. */
 					 void (*signal)(u16 applid, u32 param),
 
 					 u32 param);
