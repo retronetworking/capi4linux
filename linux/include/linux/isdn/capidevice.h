@@ -143,7 +143,9 @@ capi_appl_enqueue_message(struct capi_appl* appl, struct sk_buff* msg)
 static inline void
 capi_appl_signal_error(struct capi_appl* appl, capinfo_0x11 info)
 {
-	appl->info = info;
+	if (likely(!appl->info))
+		appl->info = info;
+
 	capi_appl_signal(appl);
 }
 #endif	/* __KERNEL__ */
