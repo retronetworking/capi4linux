@@ -45,21 +45,24 @@ struct capi_device;
  *	@capi_release:		remove an application
  *	@capi_put_message:	transfer a message
  *
- *	The device-driver must ensure, that at the time after @capi_release
- *	returns for an application, there is no thread of execution in a call
- *	to any of the operations capi_appl_signal(), capi_appl_signal_error()
- *	or capi_appl_enqueue_message() for that application.
+ *	The device-driver must provide three functions for calling by the
+ *	capicore.  This enables the capicore to register and remove
+ *	applications with devices, and transferring messages to them.
+ *
+ *	The device-driver must ensure that by the time @capi_release returns
+ *	for an application, no thread will be executing in a call from the
+ *	device-driver to any of the functions capi_appl_enqueue_message(),
+ *	capi_appl_signal(), or capi_appl_signal_error() for that application.
  *
  *	If @capi_put_message can not accept messages due to flow-control or
  *	busy reasons, it has the option of rejecting the message by either
  *	returning %CAPINFO_0X11_QUEUEFULL or %CAPINFO_0X11_BUSY, respectively.
- *	In this case, the device-driver should call capi_appl_signal(), at a
- *	later time, when it can accept messages again, and the application
- *	will then attempt to retransmit.
+ *	In this case, the device-driver should call capi_appl_signal() at a
+ *	later time, when it can accept messages again.
  *
  *	While @capi_register and @capi_release are called from process context
- *	and may block, @capi_put_message is called from bottom-half and may
- *	not block.  All three functions must be reentrant.
+ *	and may block, @capi_put_message is called from bottom-half context and
+ *	may not block.  All three functions must be reentrant.
  */
 struct capi_driver {
 	capinfo_0x10_t	(*capi_register)	(struct capi_device* dev, struct capi_appl* appl);
@@ -69,7 +72,7 @@ struct capi_driver {
 
 
 /**
- *	struct capi_device - device control structure
+ *	struct capi_device - structure representing a device instance
  *	@id:		number
  *	@product:	name
  *	@manufacturer:	manufacturer
@@ -78,6 +81,7 @@ struct capi_driver {
  *	@profile:	capabilities
  *	@drv:		operations
  *	@stats:		I/O statistics
+ *	@class_dev:	class device
  *
  *	The device-driver is responsible for updating the device
  *	I/O statistics, and may freely use the @stats.lock.
@@ -206,9 +210,8 @@ extern struct class capi_class;
  *	Context: in_irq()
  *
  *	The device-driver should wakeup the application after either
- *	enqueuing messages or clearing an issued queue-fulf/busy
- *	condition.  The device-driver may batch messages before calling
- *	capi_appl_signal().
+ *	enqueuing messages, or clearing a queue-fulf/busy condition.
+ *	The device-driver may batch messages.
  */
 static inline void
 capi_appl_signal(struct capi_appl* appl)
@@ -247,9 +250,9 @@ capi_appl_enqueue_message(struct capi_appl* appl, struct sk_buff* msg)
  *
  *	Context: in_irq()
  *
- *	Wakeup and signal a non-recoverable message exchange error to the
- *	application.  This usually implies the lost of messages, and the
- *	only recovery for the application is to do a release.
+ *	Signal a non-recoverable message exchange error to the application.
+ *	This usually implies that messages have been lost, and the only recovery
+ *	for the application is to do a release.
  */
 static inline void
 capi_appl_signal_error(struct capi_appl* appl, capinfo_0x11_t info)

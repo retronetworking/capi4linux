@@ -88,7 +88,8 @@ typedef struct capi_version {
  *	@reserved:	reserved
  *	@manu:		manufacturer specific information
  *
- *	For more information, see the CAPI standard.
+ *	For more information about the individual bit-fields,
+ *	see the CAPI standard.
  */
 typedef struct capi_profile {
 	__u16 ncontroller;

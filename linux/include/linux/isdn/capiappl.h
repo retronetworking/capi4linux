@@ -59,7 +59,7 @@ typedef void	(*capi_signal_handler_t)	(struct capi_appl* appl, unsigned long par
 
 
 /**
- *	struct capi_appl - application control structure
+ *	struct capi_appl - structure representing an application instance
  *	@id:		number
  *	@stats:		I/O statistics
  *	@params:	parameters
@@ -94,16 +94,20 @@ struct capi_appl {
  *	@signal:	signal handler
  *	@param:		parameter to signal handler
  *
- *	The signal-handler informs the application about new messages, errors
+ *	The signal-handler informs the application about new messages, errors,
  *	or cleared queue-full/busy conditions.  The signal-handler is not
  *	meant to be a workhorse, but a mechanism for waking-up and scheduling
  *	applications.
  *
- *	The signal handler must be reentrant and is called from in_irq()
+ *	The signal handler must be reentrant and will be called from in_irq()
  *	context.  Consequently, it should be as lightweight and fast as
  *	possible.
  *
- *	The application must provide a signal handler, and must not
+ *	The capicore ensures that by the time the function capi_release()
+ *	returns for @appl, no thread will be executing in a call from the
+ *	capicore to @signal for @appl.
+ *
+ *	The application must provide a signal-handler, and must not
  *	reset it once registered.
  */
 static inline void
@@ -151,8 +155,8 @@ capi_get_message(struct capi_appl* appl, struct sk_buff** msg)
  *
  *	Context: !in_irq()
  *
- *	The message is placed at the head of the application queue so that the
- *	message is fetched as next.
+ *	The message is placed at the head of the application queue, so that
+ *	the message will be fetched next.
  */
 static inline void
 capi_unget_message(struct capi_appl* appl, struct sk_buff* msg)
@@ -168,7 +172,7 @@ capi_unget_message(struct capi_appl* appl, struct sk_buff* msg)
  *	Context: !in_irq()
  *
  *	If a message is available, %CAPINFO_0X11_NOERR is returned.
- *	%CAPINFO_0X11_QUEUEEMPTY is returned if there is no message.
+ *	If there was no message, %CAPINFO_0X11_QUEUEEMPTY is returned.
  *	Otherwise, a value indicting an error is returned.
  */
 static inline capinfo_0x11_t

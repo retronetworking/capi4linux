@@ -158,8 +158,7 @@ unregister_capi_device(struct capi_device* dev)
  *	The device is assigned a unique device number, and all applications
  *	will be registered with the device in turn.  If the device fails to
  *	register an application, the device is marked as erroneous for that
- *	application with the effect, that this device is not accessible by
- *	that application.
+ *	application.
  *
  *	Upon successful registration, 0 is returned.  Otherwise, a negative
  *	error code is returned.
@@ -198,14 +197,14 @@ capi_device_register(struct capi_device* dev)
  *
  *	Context: !in_interrupt()
  *
- *	The device-driver must ensure, that at the time this function is
- *	called for @dev there is no thread of execution in the name of
- *	@dev in a call to any of the functions capi_appl_enqueue_message(),
- *	capi_appl_signal() or capi_appl_signal_error().
+ *	The device-driver must ensure that by the time it is calling this
+ *	function for @dev, no thread will be executing in a call to any
+ *	of the functions capi_appl_enqueue_message(), capi_appl_signal(),
+ *	or capi_appl_signal_error() in the name of @dev.
  *
- *	The capicore ensures, that at the time after this function has
- *	returned for @dev there is no thread of execution in a call to any
- *	of the device-driver's device operations for @dev.
+ *	Furthermore, the capicore ensures that by the time this function
+ *	returns for @dev, no thread will be executing in a call from the
+ *	capicore to that device-driver's device operations for @dev.
  *
  *	capi_device_put() should be called afterwards for @dev.
  */
@@ -260,14 +259,15 @@ bind_capi_appl(struct capi_appl* appl)
 
 
 /**
- *	capi_register - register the application with the capicore
+ *	capi_register - register an application with the capicore
  *	@appl:		application
  *
  *	Context: !in_interrupt()
  *
  *	The application is assigned a unique application number, and is
- *	registered with each device in turn.  If a device fails to register the
- *	application, the device is marked as erroneous for that application.
+ *	registered with each device in turn.  If a device fails to register
+ *	the application, the device is marked as erroneous for that
+ *	application.
  *
  *	Upon successful registration, %CAPINFO_0X10_NOERR is returned.
  *	Otherwise, a value indicting an error is returned.
@@ -304,16 +304,20 @@ capi_device_listed(struct capi_device* dev)
 
 
 /**
- *	capi_release - remove the application from the capicore
+ *	capi_release - remove an application from the capicore
  *	@appl:		application
  *
  *	Context: !in_interrupt()
  *
- *	The application is removed from each device registered with.
+ *	The @appl is removed from each device registered with.
  *
- *	The application must ensure, that at the time capi_release() is called
- *	for an application, there is no thread of execution in a call to the
- *	operation capi_put_message() for that application.
+ *	The application must ensure that by the time it is calling this
+ *	function for @appl, no thread will be executing in a call from the
+ *	application to the function capi_put_message() for @appl.
+ *
+ *	Furthermore, the capicore ensures that by the time this function
+ *	returns for @appl, no thread will be executing in a call from the
+ *	capicore to that application's signal-handler.
  *
  *	Upon successful removal, %CAPINFO_0X11_NOERR is returned.  Otherwise,
  *	an error is returned.
@@ -361,7 +365,7 @@ capi_release(struct capi_appl* appl)
  *	message could not be accepted, but this does not imply that messages
  *	cannot be accepted directed to another device, PLCI or NCCI.  This is
  *	a temporary condition and the application should retry sometime later
- *	or after being signaled.  Care must be taken by the application to
+ *	after being signaled.  Care must be taken by the application to
  *	implement the retransmit logic in race-free manner.
  *
  *	If the message was accepted, %CAPINFO_0X11_NOERR is returned.
@@ -438,8 +442,9 @@ try_get_capi_device_by_id(int id)
  *
  *	Context: !in_irq()
  *
- *	Copy the manufacturer string of the device denoted by @id to the target
- *	buffer.	 If @id is 0, copy the manufacturer string of the capicore.
+ *	Copy the manufacturer string of the device denoted by @id, to the
+ *	target buffer.  If @id is 0, copy the manufacturer string of the
+ *	capicore.
  *
  *	@manufacturer is returned if the device was available.  Otherwise,
  *	NULL is returned.
@@ -468,7 +473,7 @@ capi_get_manufacturer(int id, u8 manufacturer[CAPI_MANUFACTURER_LEN])
  *
  *	Context: !in_irq()
  *
- *	Copy the serial number string of the device denoted by @id to the
+ *	Copy the serial number string of the device denoted by @id, to the
  *	target buffer.  If @id is 0, copy the serial number string of the
  *	capicore.
  *
@@ -499,8 +504,9 @@ capi_get_serial_number(int id, u8 serial[CAPI_SERIAL_LEN])
  *
  *	Context: !in_irq()
  *
- *	Copy the version structure of the device denoted by @id to the target
- *	buffer.	 If @id is 0, copy the version structure of the capicore.
+ *	Copy the version structure of the device denoted by @id, to the
+ *	target buffer.  If @id is 0, copy the version structure of the
+ *	capicore.
  *
  *	@version is returned if the device was available.  Otherwise,
  *	NULL is returned.
@@ -531,7 +537,7 @@ capi_get_version(int id, struct capi_version* version)
  *
  *	Context: !in_irq()
  *
- *	Copy the capabilities of the device denoted by @id to the target
+ *	Copy the capabilities of the device denoted by @id, to the target
  *	buffer.	 If @id is 0, copy just the the number of installed devices.
  *
  *	@profile is returned if the device was available.  Otherwise,
@@ -562,7 +568,7 @@ capi_get_profile(int id, struct capi_profile* profile)
  *
  *	Context: !in_irq()
  *
- *	Copy the name of the device denoted by @id to the target buffer.
+ *	Copy the name of the device denoted by @id, to the target buffer.
  *
  *	@product is returned if the device was available.  Otherwise,
  *	NULL is returned.
