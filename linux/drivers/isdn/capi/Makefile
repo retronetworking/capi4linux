@@ -4,6 +4,8 @@
 
 obj-$(CONFIG_ISDN_CAPI)			+= capicore.o
 obj-$(CONFIG_ISDN_CAPI_KERNELCAPI)	+= kernelcapi.o
+obj-$(CONFIG_ISDN_CAPI_CAPI20)		+= capi.o
+obj-$(CONFIG_ISDN_CAPI_CAPIFS)		+= capifs.o
 
 # Multipart objects.
 
