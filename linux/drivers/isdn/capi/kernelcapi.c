@@ -53,7 +53,7 @@ kernelcapi_isinstalled(void)
 static u16
 kernelcapi_register(capi_register_params* param, u16* applid)
 {
-	capinfo_0x10 info;
+	capinfo_0x10_t info;
 
 	struct kernelcapi_appl* a = kmalloc(sizeof *a, GFP_KERNEL);
 	if (unlikely(!a))
@@ -86,7 +86,7 @@ static u16
 kernelcapi_release(u16 applid)
 {
 	struct kernelcapi_appl* a;
-	capinfo_0x11 info;
+	capinfo_0x11_t info;
 
 	if (unlikely(applid - 1 >= CAPI_MAX_APPLS))
 		return CAPINFO_0X11_ILLAPPNR;
@@ -106,7 +106,7 @@ static u16
 kernelcapi_put_message(u16 applid, struct sk_buff* msg)
 {
 	struct kernelcapi_appl* a;
-	capinfo_0x11 info;
+	capinfo_0x11_t info;
 	int n;
 
 	if (unlikely(applid - 1 >= CAPI_MAX_APPLS))
@@ -134,7 +134,7 @@ static u16
 kernelcapi_get_message(u16 applid, struct sk_buff** msg)
 {
 	struct kernelcapi_appl* a;
-	capinfo_0x11 info;
+	capinfo_0x11_t info;
 
 	if (unlikely(applid - 1 >= CAPI_MAX_APPLS))
 		return CAPINFO_0X11_ILLAPPNR;

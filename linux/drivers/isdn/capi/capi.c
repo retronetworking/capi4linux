@@ -154,9 +154,9 @@ static LIST_HEAD(capiminor_list);
 
 /* ------------------------------------------------------------------ */
 
-static capinfo_0x11 get_capi_message(struct capi_appl *a, struct sk_buff **msg)
+static capinfo_0x11_t get_capi_message(struct capi_appl *a, struct sk_buff **msg)
 {
-	capinfo_0x11 info = capi_get_message(a, msg);
+	capinfo_0x11_t info = capi_get_message(a, msg);
 	if (!info) {
 		int n = CAPIMSG_LEN((*msg)->data);
 		if (CAPIMSG_CMD((*msg)->data) == CAPI_DATA_B3_IND)
@@ -171,9 +171,9 @@ static capinfo_0x11 get_capi_message(struct capi_appl *a, struct sk_buff **msg)
 	return info;
 }
 
-static capinfo_0x11 put_capi_message(struct capi_appl *a, struct sk_buff *msg)
+static capinfo_0x11_t put_capi_message(struct capi_appl *a, struct sk_buff *msg)
 {
-	capinfo_0x11 info;
+	capinfo_0x11_t info;
 	int n;
 
 	n = CAPIMSG_LEN(msg->data);
@@ -543,7 +543,7 @@ static int handle_minor_send(struct capiminor *mp)
 	struct sk_buff *skb;
 	u16 len;
 	int count = 0;
-	capinfo_0x11 errcode;
+	capinfo_0x11_t errcode;
 	u16 datahandle;
 
 	if (mp->tty && mp->ttyoutstop) {

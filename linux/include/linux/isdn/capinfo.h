@@ -30,6 +30,11 @@
 #define CAPI_MAX_APPLS		CONFIG_ISDN_CAPI_MAX_APPLS
 
 
+/**
+ *	typedef capinfo_0x10_t - info class 0x10xx
+ *
+ *	Represents application registration errors.
+ */
 typedef enum {
 	CAPINFO_0X10_NOERR			= 0x0000,
 	CAPINFO_0X10_TOOMANYAPPLS		= 0x1001,
@@ -43,23 +48,28 @@ typedef enum {
 	CAPINFO_0X10_NOTINSTALLED		= 0x1009,
 	CAPINFO_0X10_CTRLDOESNOTSUPPEXTEQUIP	= 0x100a,
 	CAPINFO_0X10_CTRLDOESONLYSUPPEXTEQUIP	= 0x100b
-} capinfo_0x10;
+} capinfo_0x10_t;
 
 
+/**
+ *	typedef capinfo_0x11_t - info class 0x11xx
+ *
+ *	Represents message exchange errors.
+ */
 typedef enum {
 	CAPINFO_0X11_NOERR			= 0x0000,
 	CAPINFO_0X11_ILLAPPNR			= 0x1101,
 	CAPINFO_0X11_ILLCMDORMSGTOSMALL		= 0x1102,
-	CAPINFO_0X11_QUEUEFULL			= 0x1103,
-	CAPINFO_0X11_QUEUEEMPTY			= 0x1104,
+	CAPINFO_0X11_QUEUEFULL			= 0x1103,  /* Temporary failure */
+	CAPINFO_0X11_QUEUEEMPTY			= 0x1104,  /* Temporary failure */
 	CAPINFO_0X11_QUEUEOVERFLOW		= 0x1105,
 	CAPINFO_0X11_ILLNOTIFICATIONPARAM	= 0x1106,
-	CAPINFO_0X11_BUSY			= 0x1107,
+	CAPINFO_0X11_BUSY			= 0x1107,  /* Temporary failure */
 	CAPINFO_0X11_OSRESERR			= 0x1108,
 	CAPINFO_0X11_NOTINSTALLED		= 0x1109,
 	CAPINFO_0X11_CTRLDOESNOTSUPPEXTEQUIP	= 0x110a,
 	CAPINFO_0X11_CTRLDOESONLYSUPPEXTEQUIP	= 0x110b
-} capinfo_0x11;
+} capinfo_0x11_t;
 
 
 #endif	/* _CAPINFO_H */

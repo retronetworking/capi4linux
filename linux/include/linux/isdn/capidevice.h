@@ -39,13 +39,49 @@
 struct capi_device;
 
 
+/**
+ *	struct capi_driver - device operations structure
+ *	@capi_register:		register an application
+ *	@capi_release:		remove an application
+ *	@capi_put_message:	transfer a message
+ *
+ *	The device-driver must ensure, that at the time after @capi_release
+ *	returns for an application, there is no thread of execution in a call
+ *	to any of the operations capi_appl_signal(), capi_appl_signal_error()
+ *	or capi_appl_enqueue_message() for that application.
+ *
+ *	If @capi_put_message can not accept messages due to flow-control or
+ *	busy reasons, it has the option of rejecting the message by either
+ *	returning %CAPINFO_0X11_QUEUEFULL or %CAPINFO_0X11_BUSY, respectively.
+ *	In this case, the device-driver should call capi_appl_signal(), at a
+ *	later time, when it can accept messages again, and the application
+ *	will then attempt to retransmit.
+ *
+ *	While @capi_register and @capi_release are called from process context
+ *	and may block, @capi_put_message is called from bottom-half and may
+ *	not block.  All three functions must be reentrant.
+ */
 struct capi_driver {
-	capinfo_0x10	(*capi_register)	(struct capi_device* dev, struct capi_appl* appl);
+	capinfo_0x10_t	(*capi_register)	(struct capi_device* dev, struct capi_appl* appl);
 	void		(*capi_release)		(struct capi_device* dev, struct capi_appl* appl);
-	capinfo_0x11	(*capi_put_message)	(struct capi_device* dev, struct capi_appl* appl, struct sk_buff* msg);
+	capinfo_0x11_t	(*capi_put_message)	(struct capi_device* dev, struct capi_appl* appl, struct sk_buff* msg);
 };
 
 
+/**
+ *	struct capi_device - device control structure
+ *	@id:		number
+ *	@product:	name
+ *	@manufacturer:	manufacturer
+ *	@serial:	serial number
+ *	@version:	version
+ *	@profile:	capabilities
+ *	@drv:		operations
+ *	@stats:		I/O statistics
+ *
+ *	The device-driver is responsible for updating the device
+ *	I/O statistics, and may freely use the @stats.lock.
+ */
 struct capi_device {
 	unsigned short		id;
 
@@ -56,7 +92,7 @@ struct capi_device {
 	struct capi_profile	profile;
 
 	struct capi_driver*	drv;
-	struct rw_semaphore	sem;
+	struct rw_semaphore	sem;  /* If readable, the device is registered. */
 
 	struct capi_stats	stats;
 
@@ -71,6 +107,12 @@ int			capi_device_register	(struct capi_device* dev);
 void			capi_device_unregister	(struct capi_device* dev);
 
 
+/**
+ *	capi_device_get - increment the reference counter for a device
+ *	@dev:		device
+ *
+ *	Context: !in_irq()
+ */
 static inline struct capi_device*
 capi_device_get(struct capi_device* dev)
 {
@@ -83,6 +125,15 @@ capi_device_get(struct capi_device* dev)
 }
 
 
+/**
+ *	capi_device_put - decrement the reference counter for a device
+ *	@dev:		device
+ *
+ *	Context: !in_irq()
+ *
+ *	Decrement the reference counter for device, and if zero, free the
+ *	device structure.
+ */
 static inline void
 capi_device_put(struct capi_device* dev)
 {
@@ -90,6 +141,11 @@ capi_device_put(struct capi_device* dev)
 }
 
 
+/**
+ *	capi_device_set_devdata - set the private data pointer
+ *	@dev:		device
+ *	@data:		private data
+ */
 static inline void
 capi_device_set_devdata(struct capi_device* dev, void* data)
 {
@@ -97,6 +153,10 @@ capi_device_set_devdata(struct capi_device* dev, void* data)
 }
 
 
+/**
+ *	capi_device_get_devdata - return the private data pointer
+ *	@dev:		device
+ */
 static inline void*
 capi_device_get_devdata(struct capi_device* dev)
 {
@@ -104,6 +164,11 @@ capi_device_get_devdata(struct capi_device* dev)
 }
 
 
+/**
+ *	capi_device_set_dev - set the device pointer
+ *	@capi_dev:	device
+ *	@dev:		device
+ */
 static inline void
 capi_device_set_dev(struct capi_device* capi_dev, struct device* dev)
 {
@@ -111,6 +176,10 @@ capi_device_set_dev(struct capi_device* capi_dev, struct device* dev)
 }
 
 
+/**
+ *	capi_device_get_dev - return the device pointer
+ *	@capi_dev:	device
+ */
 static inline struct device*
 capi_device_get_dev(const struct capi_device* capi_dev)
 {
@@ -118,6 +187,10 @@ capi_device_get_dev(const struct capi_device* capi_dev)
 }
 
 
+/**
+ *	to_capi_device - cast to device structure
+ *	@cd:		class device
+ */
 static inline struct capi_device*
 to_capi_device(struct class_device* cd)
 {
@@ -126,6 +199,17 @@ to_capi_device(struct class_device* cd)
 extern struct class capi_class;
 
 
+/**
+ *	capi_appl_signal - wakeup an application
+ *	@appl:		application
+ *
+ *	Context: in_irq()
+ *
+ *	The device-driver should wakeup the application after either
+ *	enqueuing messages or clearing an issued queue-fulf/busy
+ *	condition.  The device-driver may batch messages before calling
+ *	capi_appl_signal().
+ */
 static inline void
 capi_appl_signal(struct capi_appl* appl)
 {
@@ -133,6 +217,22 @@ capi_appl_signal(struct capi_appl* appl)
 }
 
 
+/**
+ *	capi_appl_enqueue_message - add a message to the application queue
+ *	@appl:		application
+ *	@msg:		message
+ *
+ *	Context: in_irq()
+ *
+ *	The application queue has unbounded capacity, and the device-driver
+ *	must adhere to the CAPI data window protocol in order to prevent the
+ *	queue from growing immensely.  If the device-driver needs to drop a
+ *	messages, it should signal this event to the corresponding application.
+ *
+ *	In the case of a data transfer message (DATA_B3_IND), the data must be
+ *	appended to the message (this is contrary to the CAPI standard which
+ *	intends a shared buffer scheme) and the Data field will be ignored.
+ */
 static inline void
 capi_appl_enqueue_message(struct capi_appl* appl, struct sk_buff* msg)
 {
@@ -140,8 +240,19 @@ capi_appl_enqueue_message(struct capi_appl* appl, struct sk_buff* msg)
 }
 
 
+/**
+ *	capi_appl_signal_error - inform an application about an error
+ *	@appl:		application
+ *	@info:		error
+ *
+ *	Context: in_irq()
+ *
+ *	Wakeup and signal a non-recoverable message exchange error to the
+ *	application.  This usually implies the lost of messages, and the
+ *	only recovery for the application is to do a release.
+ */
 static inline void
-capi_appl_signal_error(struct capi_appl* appl, capinfo_0x11 info)
+capi_appl_signal_error(struct capi_appl* appl, capinfo_0x11_t info)
 {
 	if (likely(!appl->info))
 		appl->info = info;

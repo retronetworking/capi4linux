@@ -20,10 +20,20 @@
  * CAPI_REGISTER
  */
 
-typedef struct capi_register_params {	/* CAPI_REGISTER */
-	__u32 level3cnt;	/* No. of simulatneous user data connections */
-	__u32 datablkcnt;	/* No. of buffered data messages */
-	__u32 datablklen;	/* Size of buffered data messages */
+/**
+ *	struct capi_register_params - application parameters structure
+ *	@level3cnt:	maximum number of logical connections the application
+ *			can concurrently maintain
+ *	@datablkcnt:	maximum number of received data blocks that can be
+ *			reported to the application simultaneously for each
+ *			logical connection
+ *	@datablklen:	maximum size of the application data block to be
+ *			transmitted and received
+ */
+typedef struct capi_register_params {
+	__u32 level3cnt;
+	__u32 datablkcnt;
+	__u32 datablklen;
 } capi_register_params;
 
 #define	CAPI_REGISTER	_IOW('C',0x01,struct capi_register_params)
@@ -40,6 +50,13 @@ typedef struct capi_register_params {	/* CAPI_REGISTER */
  * CAPI_GET_VERSION
  */
 
+/**
+ *	struct capi_version - version structure
+ *	@majorversion:		major CAPI version
+ *	@minorversion:		minor CAPI version
+ *	@majormanuversion:	major manufacturer specific version
+ *	@minormanuversion:	minor manufacturer specific version
+ */
 typedef struct capi_version {
 	__u32 majorversion;
 	__u32 minorversion;
@@ -60,15 +77,28 @@ typedef struct capi_version {
  * CAPI_GET_PROFILE
  */
 
+/**
+ *	struct capi_profile - device capabilities structure
+ *	@ncontroller:	number of devices
+ *	@nbchannel:	number of B-Channels
+ *	@goptions:	global options
+ *	@support1:	B1 protocols
+ *	@support2:	B2 protocols
+ *	@support3:	B3 protocols
+ *	@reserved:	reserved
+ *	@manu:		manufacturer specific information
+ *
+ *	For more information, see the CAPI standard.
+ */
 typedef struct capi_profile {
-	__u16 ncontroller;	/* number of installed controller */
-	__u16 nbchannel;	/* number of B-Channels */
-	__u32 goptions;		/* global options */
-	__u32 support1;		/* B1 protocols support */
-	__u32 support2;		/* B2 protocols support */
-	__u32 support3;		/* B3 protocols support */
-	__u32 reserved[6];	/* reserved */
-	__u32 manu[5];		/* manufacturer specific information */
+	__u16 ncontroller;
+	__u16 nbchannel;
+	__u32 goptions;
+	__u32 support1;
+	__u32 support2;
+	__u32 support3;
+	__u32 reserved[6];
+	__u32 manu[5];
 } capi_profile;
 
 #define CAPI_GET_PROFILE	_IOWR('C',0x09,struct capi_profile)
