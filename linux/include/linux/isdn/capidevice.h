@@ -40,8 +40,6 @@ struct capi_device;
 
 
 struct capi_driver {
-	struct module*	owner;
-
 	capinfo_0x10	(*capi_register)	(struct capi_device* dev, struct capi_appl* appl);
 	void		(*capi_release)		(struct capi_device* dev, struct capi_appl* appl);
 	capinfo_0x11	(*capi_put_message)	(struct capi_device* dev, struct capi_appl* appl, struct sk_buff* msg);
@@ -66,7 +64,6 @@ struct capi_device {
 
 	struct kref		refs;
 	struct completion	done;
-	atomic_t		appls;
 
 	struct capi_stats	stats;
 
