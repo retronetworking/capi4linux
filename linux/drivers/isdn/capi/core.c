@@ -181,7 +181,7 @@ alloc_capi_appl_id(struct capi_appl* appl)
 static inline void
 release_capi_appl_id(struct capi_appl* appl)
 {
-	__clear_bit(appl->id - 1, __capi_appl_ids);
+	clear_bit(appl->id - 1, __capi_appl_ids);
 }
 
 
