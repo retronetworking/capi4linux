@@ -297,6 +297,45 @@ static inline u8 cip2si2(u16 cipval)
 	return si[cipval];
 }
 
+/* ------------------------------------------------------------------ */
+
+static capinfo_0x11 get_capi_message(struct capi_appl *a, struct sk_buff **msg)
+{
+	capinfo_0x11 info = capi_get_message(a, msg);
+	if (!info) {
+		int n = CAPIMSG_LEN((*msg)->data);
+		if (CAPIMSG_CMD((*msg)->data) == CAPI_DATA_B3_IND)
+			n += CAPIMSG_DATALEN((*msg)->data);
+
+		spin_lock_bh(&a->stats.lock);
+		a->stats.rx_packets++;
+		a->stats.rx_bytes += n;
+		spin_unlock_bh(&a->stats.lock);
+	}
+
+	return info;
+}
+
+static capinfo_0x11 put_capi_message(struct capi_appl *a, struct sk_buff *msg)
+{
+	capinfo_0x11 info;
+	int n;
+
+	n = CAPIMSG_LEN(msg->data);
+	if (CAPIMSG_CMD(msg->data) == CAPI_DATA_B3_REQ)
+		n += CAPIMSG_DATALEN(msg->data);
+
+	info = capi_put_message(a, msg);
+	if (!info) {
+		spin_lock_bh(&a->stats.lock);
+		a->stats.tx_packets++;
+		a->stats.tx_bytes += n;
+		spin_unlock_bh(&a->stats.lock);
+	}
+
+	return info;
+}
+
 
 /* -------- controller management ------------------------------------- */
 
@@ -512,7 +551,7 @@ static void send_message(capidrv_contr * card, _cmsg * cmsg)
 	len = CAPIMSG_LEN(cmsg->buf);
 	skb = alloc_skb(len, GFP_ATOMIC);
 	memcpy(skb_put(skb, len), cmsg->buf, len);
-	(void) capi_put_message(&global.ap, skb);
+	(void) put_capi_message(&global.ap, skb);
 }
 
 /* -------- state machine -------------------------------------------- */
@@ -1374,7 +1413,7 @@ static void capidrv_recv_message(unsigned long data)
 	struct sk_buff* skb;
 	capinfo_0x11 info;
 
-	while ((info = capi_get_message(&global.ap, &skb)) == CAPINFO_0X11_NOERR) {
+	while ((info = get_capi_message(&global.ap, &skb)) == CAPINFO_0X11_NOERR) {
 		capi_message2cmsg(&s_cmsg, skb->data);
 		if (debugmode > 3)
 			printk(KERN_DEBUG "capidrv_signal: applid=%d %s\n",
@@ -1879,7 +1918,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		printk(KERN_DEBUG "capidrv-%d: only %d bytes headroom, need %d\n",
 		       card->contrnr, skb_headroom(skb), msglen);
 		memcpy(skb_push(nskb, msglen), sendcmsg.buf, msglen);
-		errcode = capi_put_message(&global.ap, nskb);
+		errcode = put_capi_message(&global.ap, nskb);
 		if (errcode == CAPINFO_0X11_NOERR) {
 			dev_kfree_skb(skb);
 			nccip->datahandle++;
@@ -1893,7 +1932,7 @@ static int if_sendbuf(int id, int channel, int doack, struct sk_buff *skb)
 		return errcode == CAPINFO_0X11_QUEUEFULL ? 0 : -1;
 	} else {
 		memcpy(skb_push(skb, msglen), sendcmsg.buf, msglen);
-		errcode = capi_put_message(&global.ap, skb);
+		errcode = put_capi_message(&global.ap, skb);
 		if (errcode == CAPINFO_0X11_NOERR) {
 			nccip->datahandle++;
 			return len;
@@ -2203,24 +2242,16 @@ capidrv_remove(struct class_device* cd)
 
 /*
  * /proc/capi/capidrv:
- * nrecvctlpkt nrecvdatapkt nsendctlpkt nsenddatapkt
+ * applid
  */
 static int proc_capidrv_read_proc(char *page, char **start, off_t off,
                                        int count, int *eof, void *data)
 {
-	int len = 0;
+	int len = sprintf(page, "%u\n", global.ap.id);
 
-	len += sprintf(page+len, "%lu %lu %lu %lu\n",
-			global.ap.stats.rx_packets - global.ap.stats.rx_data_packets,
-			global.ap.stats.rx_data_packets,
-			global.ap.stats.tx_packets - global.ap.stats.tx_data_packets,
-		        global.ap.stats.tx_data_packets);
-	if (off+count >= len)
-	   *eof = 1;
-	if (len < off)
-           return 0;
-	*start = page + off;
-	return ((count < len-off) ? count : len-off);
+	*eof = 1;
+
+	return len;
 }
 
 static struct procfsentries {

@@ -151,6 +151,46 @@ static LIST_HEAD(capiminor_list);
 #endif /* CONFIG_ISDN_CAPI_MIDDLEWARE */
 
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
+
+/* ------------------------------------------------------------------ */
+
+static capinfo_0x11 get_capi_message(struct capi_appl *a, struct sk_buff **msg)
+{
+	capinfo_0x11 info = capi_get_message(a, msg);
+	if (!info) {
+		int n = CAPIMSG_LEN((*msg)->data);
+		if (CAPIMSG_CMD((*msg)->data) == CAPI_DATA_B3_IND)
+			n += CAPIMSG_DATALEN((*msg)->data);
+
+		spin_lock_bh(&a->stats.lock);
+		a->stats.rx_packets++;
+		a->stats.rx_bytes += n;
+		spin_unlock_bh(&a->stats.lock);
+	}
+
+	return info;
+}
+
+static capinfo_0x11 put_capi_message(struct capi_appl *a, struct sk_buff *msg)
+{
+	capinfo_0x11 info;
+	int n;
+
+	n = CAPIMSG_LEN(msg->data);
+	if (CAPIMSG_CMD(msg->data) == CAPI_DATA_B3_REQ)
+		n += CAPIMSG_DATALEN(msg->data);
+
+	info = capi_put_message(a, msg);
+	if (!info) {
+		spin_lock_bh(&a->stats.lock);
+		a->stats.tx_packets++;
+		a->stats.tx_bytes += n;
+		spin_unlock_bh(&a->stats.lock);
+	}
+
+	return info;
+}
+
 /* -------- datahandles --------------------------------------------- */
 
 static int capincci_add_ack(struct capiminor *mp, u16 datahandle)
@@ -461,7 +501,7 @@ static int handle_recv_skb(struct capiminor *mp, struct sk_buff *skb)
 			return -1;
 		}
 		datahandle = CAPIMSG_U16(skb->data,CAPIMSG_BASELEN+4);
-		errcode = capi_put_message(mp->ap, nskb);
+		errcode = put_capi_message(mp->ap, nskb);
 		if (errcode != CAPINFO_0X11_NOERR) {
 			printk(KERN_ERR "capi: send DATA_B3_RESP failed=%x\n",
 					errcode);
@@ -534,7 +574,7 @@ static int handle_minor_send(struct capiminor *mp)
 			skb_queue_head(&mp->outqueue, skb);
 			return count;
 		}
-		errcode = capi_put_message(mp->ap, skb);
+		errcode = put_capi_message(mp->ap, skb);
 		if (errcode == CAPINFO_0X11_NOERR) {
 			mp->datahandle++;
 			count++;
@@ -571,9 +611,8 @@ static void capi_signal(struct capi_appl *ap, unsigned long param)
 	wake_up_interruptible(&cdev->recvwait);
 }
 
-static void capi_recv_message(struct capi_appl *ap)
+static void capi_recv_message(struct capidev *cdev)
 {
-	struct capidev *cdev = container_of(ap, struct capidev, ap);
 #ifdef CONFIG_ISDN_CAPI_MIDDLEWARE
 	struct capiminor *mp;
 	u16 datahandle;
@@ -582,7 +621,7 @@ static void capi_recv_message(struct capi_appl *ap)
 	u32 ncci;
 	struct sk_buff *skb;
 
-	while (capi_get_message(&cdev->ap, &skb) == CAPINFO_0X11_NOERR) {
+	while (get_capi_message(&cdev->ap, &skb) == CAPINFO_0X11_NOERR) {
 		if (CAPIMSG_CMD(skb->data) == CAPI_CONNECT_B3_CONF) {
 			u16 info = CAPIMSG_U16(skb->data, 12); // Info field
 			if (info == 0) {
@@ -665,7 +704,7 @@ capi_read(struct file *file, char __user *buf, size_t count, loff_t *ppos)
 		return -ENODEV;
 
 	if ((skb = skb_dequeue(&cdev->recvqueue)) == 0) {
-		capi_recv_message(&cdev->ap);
+		capi_recv_message(cdev);
 
 		if ((skb = skb_dequeue(&cdev->recvqueue)) == 0)
 			return -EAGAIN;
@@ -724,7 +763,7 @@ capi_write(struct file *file, const char __user *buf, size_t count, loff_t *ppos
 		up(&cdev->ncci_list_sem);
 	}
 
-	cdev->errcode = capi_put_message(&cdev->ap, skb);
+	cdev->errcode = put_capi_message(&cdev->ap, skb);
 
 	if (cdev->errcode) {
 		kfree_skb(skb);
@@ -744,7 +783,7 @@ capi_poll(struct file *file, poll_table * wait)
 
 	poll_wait(file, &(cdev->recvwait), wait);
 
-	capi_recv_message(&cdev->ap);
+	capi_recv_message(cdev);
 	if (!skb_queue_empty(&cdev->recvqueue))
 		mask |= POLLIN | POLLRDNORM;
 
@@ -1353,44 +1392,6 @@ static void capinc_tty_exit(void)
 /* -------- /proc functions ----------------------------------------- */
 
 /*
- * /proc/capi/capi20:
- *  minor applid nrecvctlpkt nrecvdatapkt nsendctlpkt nsenddatapkt
- */
-static int proc_capidev_read_proc(char *page, char **start, off_t off,
-                                       int count, int *eof, void *data)
-{
-        struct capidev *cdev;
-	struct list_head *l;
-	int len = 0;
-
-	read_lock(&capidev_list_lock);
-	list_for_each(l, &capidev_list) {
-		cdev = list_entry(l, struct capidev, list);
-		len += sprintf(page+len, "0 %d %lu %lu %lu %lu\n",
-			cdev->ap.id,
-			cdev->ap.stats.rx_packets - cdev->ap.stats.rx_data_packets,
-			cdev->ap.stats.rx_data_packets,
-			cdev->ap.stats.tx_packets - cdev->ap.stats.tx_data_packets,
-		        cdev->ap.stats.tx_data_packets);
-		if (len <= off) {
-			off -= len;
-			len = 0;
-		} else {
-			if (len-off > count)
-				goto endloop;
-		}
-	}
-
-endloop:
-	read_unlock(&capidev_list_lock);
-	if (len < count)
-		*eof = 1;
-	if (len > count) len = count;
-	if (len < 0) len = 0;
-	return len;
-}
-
-/*
  * /proc/capi/capi20ncci:
  *  applid ncci
  */
@@ -1436,7 +1437,6 @@ static struct procfsentries {
   struct proc_dir_entry *procent;
 } procfsentries[] = {
    /* { "capi",		  S_IFDIR, 0 }, */
-   { "capi/capi20", 	  0	 , proc_capidev_read_proc },
    { "capi/capi20ncci",   0	 , proc_capincci_read_proc },
 };
 
