@@ -24,8 +24,8 @@ comment "CAPI subsystem"
 	depends on ISDN
 
 config ISDN_CAPI
-	tristate "CAPI2.0 support"
-	depends on ISDN
+	tristate "CAPI2.0 support (EXPERIMENTAL)"
+	depends on ISDN && EXPERIMENTAL
 	help
 	  This provides the CAPI (Common ISDN Application Programming
 	  Interface), a standard making it easy for programs to access ISDN
