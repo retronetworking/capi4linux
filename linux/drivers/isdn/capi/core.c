@@ -87,7 +87,10 @@ capi_driver_release_device(struct kref* kref)
 {
 	struct capi_device* dev = container_of(kref, struct capi_device, refs);
 	struct module* owner = dev->drv->owner;
-	int appls = atomic_read(&dev->appls);
+	int appls;
+
+	wmb();
+	appl = atomic_read(&dev->appls);
 
 	dev->drv->release(dev);
 
@@ -107,7 +110,7 @@ release_capi_device(struct class_device* cd)
 		__nr_capi_devices--;
 		spin_unlock(&capi_devices_table_lock);
 	}
-	
+
 	kfree(dev);
 }
 
@@ -221,7 +224,7 @@ static void
 release_capi_appl(struct kref* kref)
 {
 	struct capi_appl* appl = container_of(kref, struct capi_appl, refs);
-	
+
 	skb_queue_purge(&appl->msg_queue);
 	release_capi_appl_id(appl);
 
@@ -389,7 +392,6 @@ capi_get_message(struct capi_appl* appl, struct sk_buff** msg)
 capinfo_0x11
 capi_peek_message(struct capi_appl* appl)
 {
-	read_barrier_depends();
 	if (appl->info || !skb_queue_empty(&appl->msg_queue))
 		return CAPINFO_0X11_QUEUEFULL;
 
