@@ -101,7 +101,6 @@ struct capi_appl {
 	unsigned long		sig_param;
 
 	struct sk_buff_head	msg_queue;
-
 	capinfo_0x11		info;
 
 	unsigned long		devs[BITS_TO_LONGS(CAPI_MAX_DEVS)];
@@ -109,6 +108,8 @@ struct capi_appl {
 	struct capi_stats	stats;
 
 	capi_register_params	params;
+
+	struct list_head	entry;
 };
 
 

@@ -57,8 +57,8 @@ struct capi_device {
 	struct capi_driver*	drv;
 
 	enum capi_device_state {
-		CAPI_DEVICE_STATE_ZOMBIE
-		CAPI_DEVICE_STATE_RUNNING,
+		CAPI_DEVICE_STATE_ZOMBIE,
+		CAPI_DEVICE_STATE_RUNNING
 	}			state;
 	spinlock_t		state_lock;
 
@@ -68,6 +68,8 @@ struct capi_device {
 	struct capi_stats	stats;
 
 	struct class_device	class_dev;
+
+	struct list_head	entry;
 };
 
 
@@ -81,7 +83,7 @@ capi_device_get(struct capi_device* dev)
 {
 	if (unlikely(!dev))
 		return NULL;
-	
+
 	class_device_get(&dev->class_dev);
 
 	return dev;
@@ -134,7 +136,7 @@ extern struct class capi_class;
 static inline void
 capi_appl_signal(struct capi_appl* appl)
 {
-	appl->sig(appl, appl->sig_param);		
+	appl->sig(appl, appl->sig_param);
 }
 
 
