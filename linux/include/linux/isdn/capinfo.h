@@ -26,8 +26,8 @@
 #include <linux/config.h>
 
 
-#define CAPI_MAX_DEVS		CONFIG_CAPI_MAX_DEVS
-#define CAPI_MAX_APPLS		CONFIG_CAPI_MAX_APPLS
+#define CAPI_MAX_DEVS		CONFIG_ISDN_CAPI_MAX_DEVS
+#define CAPI_MAX_APPLS		CONFIG_ISDN_CAPI_MAX_APPLS
 
 
 typedef enum {

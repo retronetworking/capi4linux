@@ -2,7 +2,7 @@
 # Kconfig for the CAPI subsystem.
 #
 
-config CAPI_MAX_DEVS
+config ISDN_CAPI_MAX_DEVS
 	int "Maximum number of ISDN devices"
 	range 1 255
 	default "4"
@@ -11,7 +11,7 @@ config CAPI_MAX_DEVS
 	  This allows you to specify the maximum number of ISDN devices which
 	  the CAPI subsystem will support.
 
-config CAPI_MAX_APPLS
+config ISDN_CAPI_MAX_APPLS
 	int "Maximum number of CAPI applications"
 	range 8 65535
 	default "64"
@@ -20,8 +20,8 @@ config CAPI_MAX_APPLS
 	  This allows you to specify the maximum number of CAPI applications
 	  which the CAPI subsystem will support.
 
-config KERNELCAPI
-	tristate "KERNELCAPI compatibility interface (deprecated, EXPERIMENTAL)"
+config ISDN_CAPI_KERNELCAPI
+	tristate "CAPI2.0 kernelcapi interface (EXPERIMENTAL)"
 	depends on ISDN_CAPI && EXPERIMENTAL
 	help
 	  This provides the CAPI (Common ISDN Application Programming
