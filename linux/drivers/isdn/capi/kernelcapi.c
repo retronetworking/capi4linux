@@ -106,13 +106,27 @@ static u16
 kernelcapi_put_message(u16 applid, struct sk_buff* msg)
 {
 	struct kernelcapi_appl* a;
+	capinfo_0x11 info;
+	int n;
 
 	if (unlikely(applid - 1 >= CAPI_MAX_APPLS))
 		return CAPINFO_0X11_ILLAPPNR;
 
+	n = CAPIMSG_LEN(msg->data);
+	if (CAPIMSG_CMD(msg->data) == CAPI_DATA_B3_REQ)
+		n += CAPIMSG_DATALEN(msg->data);
+
 	a = kernelcapi_appls[applid - 1];
 
-	return capi_put_message(&a->appl, msg);
+	info = capi_put_message(&a->appl, msg);
+	if (!info) {
+		spin_lock_bh(&a->appl.stats.lock);
+		a->appl.stats.tx_packets++;
+		a->appl.stats.tx_bytes += n;
+		spin_unlock_bh(&a->appl.stats.lock);
+	}
+
+	return info;
 }
 
 
@@ -120,13 +134,26 @@ static u16
 kernelcapi_get_message(u16 applid, struct sk_buff** msg)
 {
 	struct kernelcapi_appl* a;
+	capinfo_0x11 info;
 
 	if (unlikely(applid - 1 >= CAPI_MAX_APPLS))
 		return CAPINFO_0X11_ILLAPPNR;
 
 	a = kernelcapi_appls[applid - 1];
 
-	return capi_get_message(&a->appl, msg);
+	info = capi_get_message(&a->appl, msg);
+	if (!info) {
+		int n = CAPIMSG_LEN((*msg)->data);
+		if (CAPIMSG_CMD((*msg)->data) == CAPI_DATA_B3_IND)
+			n += CAPIMSG_DATALEN((*msg)->data);
+
+		spin_lock_bh(&a->appl.stats.lock);
+		a->appl.stats.rx_packets++;
+		a->appl.stats.rx_bytes += n;
+		spin_unlock_bh(&a->appl.stats.lock);
+	}
+
+	return info;
 }
 
 
