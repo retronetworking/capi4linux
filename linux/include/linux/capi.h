@@ -14,9 +14,7 @@
 
 #include <asm/types.h>
 #include <linux/ioctl.h>
-#ifndef __KERNEL__
-#include <linux/kernelcapi.h>
-#endif
+#include <linux/compiler.h>
 
 /*
  * CAPI_REGISTER
