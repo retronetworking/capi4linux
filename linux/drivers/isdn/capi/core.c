@@ -135,7 +135,7 @@ register_capi_appl(struct capi_appl* appl, struct capi_device* dev)
 		return;
 	}
 
-	__set_bit(dev->id - 1, appl->devs);
+	set_bit(dev->id - 1, appl->devs);
 	capi_device_get(dev);
 }
 
