@@ -331,7 +331,7 @@ kernelcapi_exit(void)
 {
 	class_interface_unregister(&kernelcapi_iface);
 
-	pr_info("kernelcapi: unload\n");
+	pr_info("kernelcapi: unloaded\n");
 }
 
 
