@@ -6,4 +6,4 @@ obj-$(CONFIG_ISDN_CAPI)			+= capicore.o kernelcapi.o
 
 # Multipart objects.
 
-capicore-y				:= core.o core_sysfs.o
+capicore-y				:= core.o core_sysfs.o core_proc.o

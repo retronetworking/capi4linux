@@ -30,17 +30,13 @@
 static struct capi_device* capi_devs_table[CAPI_MAX_DEVS];
 static spinlock_t capi_devs_table_lock = SPIN_LOCK_UNLOCKED;
 
-static LIST_HEAD(capi_appls_list);
-static DECLARE_MUTEX(capi_appls_list_sem);
+LIST_HEAD(capi_appls_list);
+DECLARE_MUTEX(capi_appls_list_sem);
 
 static LIST_HEAD(capi_devs_list);
 static DECLARE_RWSEM(capi_devs_list_sem);
 
 atomic_t nr_capi_devs = ATOMIC_INIT(0);
-
-
-int	capi_device_register_sysfs	(struct capi_device* dev);
-void	unregister_capi_device		(struct capi_device* dev);
 
 
 struct capi_device*
@@ -129,9 +125,23 @@ bind_capi_device(struct capi_device* dev)
 }
 
 
+void
+unregister_capi_device(struct capi_device* dev)
+{
+	down_write(&capi_devs_list_sem);
+	list_del(&dev->entry);
+	up_write(&capi_devs_list_sem);
+
+	down_write(&dev->sem);
+	atomic_dec(&nr_capi_devs);
+}
+
+
 int
 capi_device_register(struct capi_device* dev)
 {
+	int	capi_device_register_sysfs	(struct capi_device* dev);
+
 	int res;
 
 	if (unlikely(!dev))
@@ -152,18 +162,6 @@ capi_device_register(struct capi_device* dev)
 		unregister_capi_device(dev);
 
 	return res;
-}
-
-
-void
-unregister_capi_device(struct capi_device* dev)
-{
-	down_write(&capi_devs_list_sem);
-	list_del(&dev->entry);
-	up_write(&capi_devs_list_sem);
-
-	down_write(&dev->sem);
-	atomic_dec(&nr_capi_devs);
 }
 
 
@@ -209,13 +207,17 @@ static inline void
 bind_capi_appl(struct capi_appl* appl)
 {
 	struct capi_device* dev;
+	struct capi_appl* a ;
 
 	down_read(&capi_devs_list_sem);
 	list_for_each_entry(dev, &capi_devs_list, entry)
 		register_capi_appl(appl, dev);
 
 	down(&capi_appls_list_sem);
-	list_add_tail(&appl->entry, &capi_appls_list);
+	list_for_each_entry(a, &capi_appls_list, entry)
+		if (a->id > appl->id)
+			break;
+	list_add_tail(&appl->entry, &a->entry);
 	up(&capi_appls_list_sem);
 
 	up_read(&capi_devs_list_sem);
@@ -428,6 +430,12 @@ capi_get_profile(int id, struct capi_profile* profile)
 static int __init
 capicore_init(void)
 {
+	int	capi_register_proc	(void);
+
+	int res = capi_register_proc();
+	if (res)
+		return res;
+
 	return class_register(&capi_class);
 }
 
@@ -435,7 +443,10 @@ capicore_init(void)
 static void __exit
 capicore_exit(void)
 {
+	void	capi_unregister_proc	(void);
+
 	class_unregister(&capi_class);
+	capi_unregister_proc();
 }
 
 
