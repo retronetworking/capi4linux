@@ -35,11 +35,11 @@ CLASS_DEVICE_ATTR(manufacturer, S_IRUGO, show_manufacturer, NULL);
 
 
 static ssize_t
-show_serial(struct class_device* cd, char* buf)
+show_serial_number(struct class_device* cd, char* buf)
 {
-	return sprintf(buf, "%s", to_capi_device(cd)->serial);
+	return snprintf(buf, CAPI_SERIAL_LEN, "%s", to_capi_device(cd)->serial);
 }
-CLASS_DEVICE_ATTR(serial, S_IRUGO, show_serial, NULL);
+CLASS_DEVICE_ATTR(serial_number, S_IRUGO, show_serial_number, NULL);
 
 
 static ssize_t
@@ -54,7 +54,7 @@ CLASS_DEVICE_ATTR(version, S_IRUGO, show_version, NULL);
 
 static struct class_device_attribute* attrs[] = {
 	&class_device_attr_manufacturer,
-	&class_device_attr_serial,
+	&class_device_attr_serial_number,
 	&class_device_attr_version,
 	NULL
 };

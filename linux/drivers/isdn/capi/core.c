@@ -355,7 +355,7 @@ capi_get_manufacturer(int id, u8 manufacturer[CAPI_MANUFACTURER_LEN])
 
 
 u8*
-capi_get_serial(int id, u8 serial[CAPI_SERIAL_LEN])
+capi_get_serial_number(int id, u8 serial[CAPI_SERIAL_LEN])
 {
 	if (id) {
 		struct capi_device* dev = try_get_capi_device_by_id(id);
@@ -440,6 +440,6 @@ EXPORT_SYMBOL(capi_get_message);
 EXPORT_SYMBOL(capi_peek_message);
 EXPORT_SYMBOL(capi_isinstalled);
 EXPORT_SYMBOL(capi_get_manufacturer);
-EXPORT_SYMBOL(capi_get_serial);
+EXPORT_SYMBOL(capi_get_serial_number);
 EXPORT_SYMBOL(capi_get_version);
 EXPORT_SYMBOL(capi_get_profile);

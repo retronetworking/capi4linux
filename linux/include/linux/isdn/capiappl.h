@@ -138,7 +138,7 @@ capinfo_0x11	capi_peek_message	(struct capi_appl* appl);
 capinfo_0x11	capi_isinstalled	(void);
 
 struct capi_version*	capi_get_version	(int dev, struct capi_version* version);
-u8*			capi_get_serial		(int dev, u8 serial[CAPI_SERIAL_LEN]);
+u8*			capi_get_serial_number	(int dev, u8 serial[CAPI_SERIAL_LEN]);
 capinfo_0x11		capi_get_profile	(int dev, struct capi_profile* profile);
 u8*			capi_get_manufacturer	(int dev, u8 manufacturer[CAPI_MANUFACTURER_LEN]);
 #endif	/* __KERNEL__ */
