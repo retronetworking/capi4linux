@@ -313,8 +313,9 @@ capi_put_message(struct capi_appl* appl, struct sk_buff* msg)
 	if (unlikely(!(id && id <= CAPI_MAX_DEVS && test_bit(id - 1, appl->devs))))
 		return CAPINFO_0X11_OSRESERR;
 
-	dev = try_get_capi_device(capi_devices_table[id - 1]);
-	if (unlikely(!dev))
+	dev = capi_devices_table[id - 1];
+	BUG_ON(!dev);
+	if (unlikely(!try_get_capi_device(dev)))
 		return CAPINFO_0X11_OSRESERR;
 	info = dev->drv->capi_put_message(dev, appl, msg);
 	put_capi_device(dev);
