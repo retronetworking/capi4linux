@@ -19,18 +19,21 @@
  */
 
 
-#include "core.h"
 #include <linux/module.h>
 #include <linux/init.h>
 #include <linux/kernel.h>
 #include <linux/skbuff.h>
+#include <linux/isdn/capidevice.h>
 #include <linux/isdn/capiutil.h>
 #include <linux/isdn/capicmd.h>
 
 
 struct capi_device* capi_devices_table[CAPI_MAX_DEVS];
 spinlock_t capi_devices_table_lock;
-int __nr_capi_devices;
+int nr_capi_devices;
+
+
+int	capi_device_register_sysfs	(struct capi_device* dev);
 
 
 static inline void
@@ -46,12 +49,12 @@ capi_device_get(struct capi_device* dev)
 	if (!dev)
 		return NULL;
 
-	spin_lock(&dev->lock);
+	spin_lock(&dev->state_lock);
 	if (unlikely(dev->state == CAPI_DEVICE_STATE_ZOMBIE))
 		dev = NULL;
 	else
 		__capi_device_get(dev);
-	spin_unlock(&dev->lock);
+	spin_unlock(&dev->state_lock);
 
 	return dev;
 }
@@ -89,8 +92,8 @@ capi_driver_release_device(struct kref* kref)
 	struct module* owner = dev->drv->owner;
 	int appls;
 
-	wmb();
-	appl = atomic_read(&dev->appls);
+	smp_wmb();
+	appls = atomic_read(&dev->appls);
 
 	dev->drv->release(dev);
 
@@ -107,7 +110,7 @@ release_capi_device(struct class_device* cd)
 	if (likely(dev->id)) {
 		spin_lock(&capi_devices_table_lock);
 		capi_devices_table[dev->id - 1] = NULL;
-		__nr_capi_devices--;
+		nr_capi_devices--;
 		spin_unlock(&capi_devices_table_lock);
 	}
 
@@ -124,7 +127,7 @@ register_capi_device(struct capi_device* dev)
 	for (id = 0; id < CAPI_MAX_DEVS; id++)
 		if (!capi_devices_table[id]) {
 			capi_devices_table[id] = dev;
-			__nr_capi_devices++;
+			nr_capi_devices++;
 			dev->id = id + 1;
 			break;
 		}
@@ -151,7 +154,7 @@ capi_device_register(struct capi_device* dev)
 
 	kref_init(&dev->refs, capi_driver_release_device);
 	spin_lock_init(&dev->stats.lock);
-	spin_lock_init(&dev->lock);
+	spin_lock_init(&dev->state_lock);
 	atomic_set(&dev->appls, 0);
 
 	dev->state = CAPI_DEVICE_STATE_RUNNING;
@@ -165,9 +168,9 @@ capi_device_unregister(struct capi_device* dev)
 {
 	class_device_del(&dev->class_dev);
 
-	spin_lock(&dev->lock);
+	spin_lock(&dev->state_lock);
 	dev->state = CAPI_DEVICE_STATE_ZOMBIE;
-	spin_unlock(&dev->lock);
+	spin_unlock(&dev->state_lock);
 
 	BUG_ON(!module_is_live(dev->drv->owner) && atomic_read(&dev->refs.refcount) != 1);
 	capi_device_put(dev);
@@ -274,13 +277,13 @@ capi_register(struct capi_appl* appl)
 		if (!dev)
 			continue;
 
-		spin_lock(&dev->lock);
+		spin_lock(&dev->state_lock);
 		if (unlikely(!(dev->state == CAPI_DEVICE_STATE_RUNNING && try_module_get(dev->drv->owner)))) {
-			spin_unlock(&dev->lock);
+			spin_unlock(&dev->state_lock);
 			continue;
 		}
 		__capi_device_get(dev);
-		spin_unlock(&dev->lock);
+		spin_unlock(&dev->state_lock);
 		spin_unlock(&capi_devices_table_lock);
 
 		info = dev->drv->capi_register(dev, appl);
@@ -402,7 +405,7 @@ capi_peek_message(struct capi_appl* appl)
 capinfo_0x11
 capi_isinstalled(void)
 {
-	if (nr_capi_devices())
+	if (nr_capi_devices)
 		return CAPINFO_0X11_NOERR;
 	else
 		return CAPINFO_0X11_NOTINSTALLED;
@@ -491,12 +494,12 @@ capi_get_profile(int id, struct capi_profile* profile)
 		struct capi_device* dev = capi_device_by_id_get(id);
 		if (dev) {
 			*profile = dev->profile;
-			profile->ncontroller = nr_capi_devices();
+			profile->ncontroller = nr_capi_devices;
 		} else
 			info = CAPINFO_0X11_OSRESERR;
 		capi_device_put(dev);
 	} else
-		profile->ncontroller = nr_capi_devices();
+		profile->ncontroller = nr_capi_devices;
 
 	return info;
 }
