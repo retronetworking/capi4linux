@@ -43,30 +43,6 @@ int	capi_device_register_sysfs	(struct capi_device* dev);
 void	unregister_capi_device		(struct capi_device* dev);
 
 
-static struct capi_device*
-try_get_capi_device(struct capi_device* dev)
-{
-	if (!dev)
-		return NULL;
-
-	spin_lock(&dev->state_lock);
-	if (likely(dev->state == CAPI_DEVICE_STATE_RUNNING))
-		kref_get(&dev->refs);
-	else
-		dev = NULL;
-	spin_unlock(&dev->state_lock);
-
-	return dev;
-}
-
-
-static inline void
-put_capi_device(struct capi_device* dev)
-{
-	kref_put(&dev->refs);
-}
-
-
 struct capi_device*
 capi_device_alloc(void)
 {
@@ -80,15 +56,6 @@ capi_device_alloc(void)
 	class_device_initialize(&dev->class_dev);
 
 	return dev;
-}
-
-
-static void
-release_capi_device(struct kref* kref)
-{
-	struct capi_device* dev = container_of(kref, struct capi_device, refs);
-
-	complete(&dev->done);
 }
 
 
@@ -131,7 +98,7 @@ register_capi_appl(struct capi_appl* appl, struct capi_device* dev)
 {
 	capinfo_0x11 info = dev->drv->capi_register(dev, appl);
 	if (unlikely(info)) {
-		printk(KERN_NOTICE "capi: appl %d couldn't be registered with device %d (reason: %#x).\n", appl->id, dev->id, info);
+		printk(KERN_NOTICE "capi: appl %d couldn't be registered with device %d (info: %#x).\n", appl->id, dev->id, info);
 		return;
 	}
 
@@ -152,10 +119,10 @@ bind_capi_device(struct capi_device* dev)
 	list_for_each_entry(appl, &capi_appls_list, entry)
 		register_capi_appl(appl, dev);
 
-	spin_lock(&dev->state_lock);
-	dev->state = CAPI_DEVICE_STATE_RUNNING;
+	preempt_disable();
 	atomic_inc(&nr_capi_devs);
-	spin_unlock(&dev->state_lock);
+	up_write(&dev->sem);
+	preempt_enable();
 
 	up(&capi_appls_list_sem);
 	up_write(&capi_devs_list_sem);
@@ -170,11 +137,8 @@ capi_device_register(struct capi_device* dev)
 	if (unlikely(!dev))
 		return -EINVAL;
 
-	dev->state = CAPI_DEVICE_STATE_ZOMBIE;
-	spin_lock_init(&dev->state_lock);
-
-	kref_init(&dev->refs, release_capi_device);
-	init_completion(&dev->done);
+	init_rwsem(&dev->sem);
+	down_write(&dev->sem);
 
 	spin_lock_init(&dev->stats.lock);
 
@@ -198,13 +162,7 @@ unregister_capi_device(struct capi_device* dev)
 	list_del(&dev->entry);
 	up_write(&capi_devs_list_sem);
 
-	spin_lock(&dev->state_lock);
-	dev->state = CAPI_DEVICE_STATE_ZOMBIE;
-	spin_unlock(&dev->state_lock);
-
-	put_capi_device(dev);
-	wait_for_completion(&dev->done);
-
+	down_write(&dev->sem);
 	atomic_dec(&nr_capi_devs);
 }
 
@@ -303,9 +261,9 @@ capi_release(struct capi_appl* appl)
 	for (i = 0; (i = find_next_bit(appl->devs, CAPI_MAX_DEVS, i)) < CAPI_MAX_DEVS; i++) {
 		dev = capi_devs_table[i];
 		BUG_ON(!dev);
-		if (likely(try_get_capi_device(dev))) {
+		if (likely(down_read_trylock(&dev->sem))) {
 			dev->drv->capi_release(dev, appl);
-			put_capi_device(dev);
+			up_read(&dev->sem);
 		}
 		capi_device_put(dev);
 	}
@@ -336,10 +294,10 @@ capi_put_message(struct capi_appl* appl, struct sk_buff* msg)
 
 	dev = capi_devs_table[id - 1];
 	BUG_ON(!dev);
-	if (unlikely(!try_get_capi_device(dev)))
+	if (unlikely(!down_read_trylock(&dev->sem)))
 		return CAPINFO_0X11_OSRESERR;
 	info = dev->drv->capi_put_message(dev, appl, msg);
-	put_capi_device(dev);
+	up_read(&dev->sem);
 
 	return info;
 }
@@ -351,7 +309,9 @@ capi_get_message(struct capi_appl* appl, struct sk_buff** msg)
 	if (unlikely(appl->info))
 		return appl->info;
 
-	return (*msg = skb_dequeue(&appl->msg_queue)) ? CAPINFO_0X11_NOERR : CAPINFO_0X11_QUEUEEMPTY;
+	return (*msg = skb_dequeue(&appl->msg_queue)) ?
+		CAPINFO_0X11_NOERR :
+		CAPINFO_0X11_QUEUEEMPTY;
 }
 
 
@@ -361,14 +321,18 @@ capi_peek_message(struct capi_appl* appl)
 	if (unlikely(appl->info))
 		return appl->info;
 
-	return skb_queue_empty(&appl->msg_queue) ? CAPINFO_0X11_QUEUEEMPTY : CAPINFO_0X11_NOERR;
+	return skb_queue_empty(&appl->msg_queue) ?
+		CAPINFO_0X11_QUEUEEMPTY :
+		CAPINFO_0X11_NOERR;
 }
 
 
 capinfo_0x11
 capi_isinstalled(void)
 {
-	return atomic_read(&nr_capi_devs) ? CAPINFO_0X11_NOERR : CAPINFO_0X11_NOTINSTALLED;
+	return atomic_read(&nr_capi_devs) ?
+		CAPINFO_0X11_NOERR :
+		CAPINFO_0X11_NOTINSTALLED;
 }
 
 
@@ -381,7 +345,9 @@ try_get_capi_device_by_id(int id)
 		return NULL;
 
 	spin_lock(&capi_devs_table_lock);
-	dev = try_get_capi_device(capi_devs_table[id - 1]);
+	dev = capi_devs_table[id - 1];
+	if (dev && !down_read_trylock(&dev->sem))
+		dev = NULL;
 	spin_unlock(&capi_devs_table_lock);
 
 	return dev;
@@ -397,7 +363,7 @@ capi_get_manufacturer(int id, u8 manufacturer[CAPI_MANUFACTURER_LEN])
 			return NULL;
 
 		memcpy(manufacturer, dev->manufacturer, CAPI_MANUFACTURER_LEN);
-		put_capi_device(dev);
+		up_read(&dev->sem);
 	} else
 		strlcpy(manufacturer, "NGC4Linux", CAPI_MANUFACTURER_LEN);
 
@@ -414,7 +380,7 @@ capi_get_serial_number(int id, u8 serial[CAPI_SERIAL_LEN])
 			return NULL;
 
 		memcpy(serial, dev->serial, CAPI_SERIAL_LEN);
-		put_capi_device(dev);
+		up_read(&dev->sem);
 	} else
 		strlcpy(serial, "0", CAPI_SERIAL_LEN);
 
@@ -433,7 +399,7 @@ capi_get_version(int id, struct capi_version* version)
 			return NULL;
 
 		*version = dev->version;
-		put_capi_device(dev);
+		up_read(&dev->sem);
 	} else
 		*version = capicore_version;
 
@@ -451,11 +417,11 @@ capi_get_profile(int id, struct capi_profile* profile)
 
 		*profile = dev->profile;
 		profile->ncontroller = atomic_read(&nr_capi_devs);
-		put_capi_device(dev);
+		up_read(&dev->sem);
 	} else
 		profile->ncontroller = atomic_read(&nr_capi_devs);
 
-	return	CAPINFO_0X11_NOERR;
+	return CAPINFO_0X11_NOERR;
 }
 
 
