@@ -1,0 +1,21 @@
+#
+# Kconfig for the CAPI subsystem.
+#
+
+config CAPI_MAX_DEVS
+	int "Maximum number of ISDN devices"
+	range 1 255
+	default "4"
+	depends on ISDN_CAPI
+	help
+	  This allows you to specify the maximum number of ISDN devices which
+	  the CAPI subsystem will support.
+
+config CAPI_MAX_APPLS
+	int "Maximum number of CAPI applications"
+	range 32 65535
+	default "128"
+	depends on ISDN_CAPI
+	help
+	  This allows you to specify the maximum number of CAPI applications
+	  which the CAPI subsystem will support.
