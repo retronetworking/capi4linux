@@ -91,13 +91,13 @@ struct capi_stats {
 };
 
 
-typedef void	(*capi_signal_func)	(struct capi_appl* appl, unsigned long param);
+typedef void	(*capi_signal_handler)	(struct capi_appl* appl, unsigned long param);
 
 
 struct capi_appl {
 	u16			id;
 
-	capi_signal_func	sig;
+	capi_signal_handler	sig;
 	unsigned long		sig_param;
 
 	struct sk_buff_head	msg_queue;
@@ -113,7 +113,7 @@ struct capi_appl {
 
 
 static inline void
-capi_set_signal(struct capi_appl* appl, capi_signal_func signal, unsigned long param)
+capi_set_signal(struct capi_appl* appl, capi_signal_handler signal, unsigned long param)
 {
 	if (!appl)
 		return;

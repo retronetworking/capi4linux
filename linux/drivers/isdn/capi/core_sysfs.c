@@ -61,7 +61,7 @@ static struct class_device_attribute* attrs[] = {
 
 
 #define STAT_ENTRY(name)						\
-static ssize_t					       			\
+static ssize_t								\
 show_##name(struct class_device* cd, char* buf)				\
 {									\
 	return sprintf(buf, "%lu", to_capi_device(cd)->stats.name);	\

@@ -57,8 +57,8 @@ struct capi_device {
 	struct capi_driver*	drv;
 
 	enum capi_device_state {
-		CAPI_DEVICE_STATE_RUNNING,
 		CAPI_DEVICE_STATE_ZOMBIE
+		CAPI_DEVICE_STATE_RUNNING,
 	}			state;
 	spinlock_t		state_lock;
 
