@@ -83,7 +83,7 @@ static int
 applparams_show(struct seq_file* seq, void* v)
 {
 	if (v == SEQ_START_TOKEN)
-		seq_puts(seq, "ID   : LogConns DataPackets DataLen\n");
+		seq_puts(seq, "id   : logConns dataPackets dataLen\n");
 	else {
 		const struct capi_appl* a = v;
 
@@ -129,7 +129,7 @@ static int
 applstats_show(struct seq_file* seq, void* v)
 {
 	if (v == SEQ_START_TOKEN)
-		seq_puts(seq, "ID   : txPackets txBytes txDataPackets txDataBytes | rxPackets rxBytes rxDataPackets rxDataBytes rxQueue\n");
+		seq_puts(seq, "id   : txPackets txBytes txDataPackets txDataBytes | rxPackets rxBytes rxDataPackets rxDataBytes rxQueue\n");
 	else {
 		const struct capi_appl* a = v;
 
