@@ -49,6 +49,7 @@ struct capi_driver {
 struct capi_device {
 	unsigned short		id;
 
+	u8			product[CAPI_PRODUCT_LEN];
 	u8			manufacturer[CAPI_MANUFACTURER_LEN];
 	u8			serial[CAPI_SERIAL_LEN];
 	struct capi_version	version;

@@ -30,6 +30,9 @@
 #include <linux/isdn/capinfo.h>
 
 
+#define CAPI_PRODUCT_LEN	KOBJ_NAME_LEN
+
+
 struct capi_appl;
 
 
@@ -101,10 +104,11 @@ capinfo_0x11	capi_get_message	(struct capi_appl* appl, struct sk_buff** msg);
 capinfo_0x11	capi_peek_message	(struct capi_appl* appl);
 capinfo_0x11	capi_isinstalled	(void);
 
-struct capi_version*	capi_get_version	(int dev, struct capi_version* version);
-u8*			capi_get_serial_number	(int dev, u8 serial[CAPI_SERIAL_LEN]);
-capinfo_0x11		capi_get_profile	(int dev, struct capi_profile* profile);
 u8*			capi_get_manufacturer	(int dev, u8 manufacturer[CAPI_MANUFACTURER_LEN]);
+u8*			capi_get_serial_number	(int dev, u8 serial[CAPI_SERIAL_LEN]);
+struct capi_version*	capi_get_version	(int dev, struct capi_version* version);
+capinfo_0x11		capi_get_profile	(int dev, struct capi_profile* profile);
+u8*			capi_get_product	(int id, u8 product[CAPI_PRODUCT_LEN]);
 #endif	/* __KERNEL__ */
 
 

@@ -52,10 +52,21 @@ show_version(struct class_device* cd, char* buf)
 CLASS_DEVICE_ATTR(version, S_IRUGO, show_version, NULL);
 
 
+static ssize_t
+show_product(struct class_device* cd, char* buf)
+{
+	struct capi_device* dev = to_capi_device(cd);
+
+	return sprintf(buf, "%s\n", dev->product);
+}
+CLASS_DEVICE_ATTR(product, S_IRUGO, show_product, NULL);
+
+
 static struct class_device_attribute* attrs[] = {
 	&class_device_attr_manufacturer,
 	&class_device_attr_serial_number,
 	&class_device_attr_version,
+	&class_device_attr_product,
 	NULL
 };
 

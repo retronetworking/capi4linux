@@ -420,6 +420,23 @@ capi_get_profile(int id, struct capi_profile* profile)
 }
 
 
+u8*
+capi_get_product(int id, u8 product[CAPI_PRODUCT_LEN])
+{
+	if (id) {
+		struct capi_device* dev = try_get_capi_device_by_id(id);
+		if (!dev)
+			return NULL;
+
+		memcpy(product, dev->product, CAPI_PRODUCT_LEN);
+		up_read(&dev->sem);
+	} else
+		return NULL;
+
+	return product;
+}
+
+
 static int __init
 capicore_init(void)
 {
@@ -464,3 +481,4 @@ EXPORT_SYMBOL(capi_get_manufacturer);
 EXPORT_SYMBOL(capi_get_serial_number);
 EXPORT_SYMBOL(capi_get_version);
 EXPORT_SYMBOL(capi_get_profile);
+EXPORT_SYMBOL(capi_get_product);
