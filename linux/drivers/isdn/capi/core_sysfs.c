@@ -60,47 +60,6 @@ static struct class_device_attribute* attrs[] = {
 };
 
 
-static ssize_t
-read_profile(struct kobject* kobj, char* buf, loff_t pos, size_t size)
-{
-	extern atomic_t nr_capi_devices;
-	const int CAPI_PROFILE_LEN = 64;
-	char b[CAPI_PROFILE_LEN];
-	struct capi_profile* p;
-
-	if (pos > CAPI_PROFILE_LEN)
-		return 0;
-
-	if (pos + size > CAPI_PROFILE_LEN)
-		size = CAPI_PROFILE_LEN - pos;
-
-	p = &to_capi_device(container_of(kobj, struct class_device, kobj))->profile;
-
-	capimsg_setu16(b, 0, atomic_read(&nr_capi_devices));
-	capimsg_setu16(b, 2, p->nbchannel);
-	memcpy(b + 4, &p->goptions, 4);
-	memcpy(b + 8, &p->support1, 4);
-	memcpy(b + 12, &p->support2, 4);
-	memcpy(b + 16, &p->support3, 4);
-	memset(b + 20, 0, 24);
-	memcpy(b + 44, &p->manu, 20);
-
-	memcpy(buf, b + pos, size);
-
-	return size;
-}
-
-
-static struct bin_attribute profile_attr = {
-	.attr	= { .name	= "profile",
-		    .owner	= THIS_MODULE,
-		    .mode	= S_IRUGO
-	},
-	.size	= 64,
-	.read	= read_profile
-};
-
-
 #define STAT_ENTRY(name)						\
 static ssize_t					       			\
 show_##name(struct class_device* cd, char* buf)				\
@@ -162,10 +121,6 @@ capi_device_register_sysfs(struct capi_device* dev)
 		if (unlikely(err))
 			goto out;
 	}
-
-	err = sysfs_create_bin_file(&cd->kobj, &profile_attr);
-	if (unlikely(err))
-		goto out;
 
 	err = sysfs_create_group(&cd->kobj, &stats_attrs_group);
 	if (unlikely(err))
