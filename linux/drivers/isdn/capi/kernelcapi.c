@@ -306,5 +306,9 @@ module_init(kernelcapi_init);
 module_exit(kernelcapi_exit);
 
 
+MODULE_AUTHOR("Frank A. Uepping <Frank.Uepping@web.de>");
+MODULE_LICENSE("GPL");
+
+
 EXPORT_SYMBOL(attach_capi_interface);
 EXPORT_SYMBOL(detach_capi_interface);
