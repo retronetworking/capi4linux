@@ -325,7 +325,8 @@ capi_release(struct capi_appl* appl)
 	int id;
 
 	for (id = 0; (id = find_next_bit(appl->devs, CAPI_MAX_DEVS, id)) < CAPI_MAX_DEVS; id++) {
-		BUG_ON(!(dev = capi_devices_table[id]));
+		dev = capi_devices_table[id];
+		BUG_ON(!dev);
 		if (likely(capi_device_get(dev))) {
 			dev->drv->capi_release(dev, appl);
 
