@@ -447,11 +447,11 @@ capicore_init(void)
 	int	capi_register_proc	(void);
 
 	int res = capi_register_proc();
-	if (res)
+	if (unlikely(res))
 		return res;
 
 	res = class_register(&capi_class);
-	if (!res)
+	if (unlikely(!res))
 		pr_info("capicore: $Revision$\n");
 
 	return res;
