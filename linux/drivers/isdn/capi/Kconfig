@@ -19,3 +19,13 @@ config CAPI_MAX_APPLS
 	help
 	  This allows you to specify the maximum number of CAPI applications
 	  which the CAPI subsystem will support.
+
+config KERNELCAPI
+	tristate "KERNELCAPI compatibility interface (deprecated, EXPERIMENTAL)"
+	depends on ISDN_CAPI && EXPERIMENTAL
+	help
+	  This provides the CAPI (Common ISDN Application Programming
+	  Interface) for kernel level applications as described by the CAPI2.0
+	  standard, see <http://www.capi.org>.
+	  However, kernel level applications should use the new API, see
+	  include/linux/isdn/capiappl.h.

@@ -2,7 +2,7 @@
 
 # Each configuration option enables a list of files.
 
-obj-$(CONFIG_ISDN_CAPI)			+= capicore.o
+obj-$(CONFIG_ISDN_CAPI)			+= capicore.o kernelcapi.o
 
 # Multipart objects.
 
