@@ -61,9 +61,9 @@ free_capi_device(struct class_device* cd)
 	struct capi_device* dev = to_capi_device(cd);
 
 	if (likely(dev->id)) {
-		spin_lock(&capi_devs_table_lock);
+		spin_lock_bh(&capi_devs_table_lock);
 		capi_devs_table[dev->id - 1] = NULL;
-		spin_unlock(&capi_devs_table_lock);
+		spin_unlock_bh(&capi_devs_table_lock);
 	}
 
 	kfree(dev);
@@ -75,17 +75,14 @@ add_capi_device(struct capi_device* dev)
 {
 	int i;
 
-	spin_lock(&capi_devs_table_lock);
 	for (i = 0; i < CAPI_MAX_DEVS; i++)
 		if (!capi_devs_table[i]) {
 			capi_devs_table[i] = dev;
-			spin_unlock(&capi_devs_table_lock);
 
 			return dev->id = i + 1;
 		}
-	spin_unlock(&capi_devs_table_lock);
 
-	return 0;
+	return dev->id = 0;
 }
 
 
@@ -103,22 +100,24 @@ register_capi_appl(struct capi_appl* appl, struct capi_device* dev)
 }
 
 
-static inline void
+static inline int
 bind_capi_device(struct capi_device* dev)
 {
 	struct capi_appl* appl;
 
 	down_write(&capi_devs_list_sem);
-	list_for_each_entry(appl, &capi_appls_list, entry)
-		register_capi_appl(appl, dev);
+	if (likely(add_capi_device(dev))) {
+		list_for_each_entry(appl, &capi_appls_list, entry)
+			register_capi_appl(appl, dev);
 
-	preempt_disable();
-	atomic_inc(&nr_capi_devs);
-	up_write(&dev->sem);
-	preempt_enable();
+		up_write(&dev->sem);
+		atomic_inc(&nr_capi_devs);
 
-	list_add_tail(&dev->entry, &capi_devs_list);
+		list_add_tail(&dev->entry, &capi_devs_list);
+	}
 	up_write(&capi_devs_list_sem);
+
+	return dev->id;
 }
 
 
@@ -149,10 +148,8 @@ capi_device_register(struct capi_device* dev)
 
 	spin_lock_init(&dev->stats.lock);
 
-	if (unlikely(!add_capi_device(dev)))
+	if (unlikely(!bind_capi_device(dev)))
 		return -EMFILE;
-
-	bind_capi_device(dev);
 
 	res = capi_device_register_sysfs(dev);
 	if (unlikely(res))
@@ -343,11 +340,11 @@ try_get_capi_device_by_id(int id)
 	if (id < 1 || id > CAPI_MAX_DEVS)
 		return NULL;
 
-	spin_lock(&capi_devs_table_lock);
+	spin_lock_bh(&capi_devs_table_lock);
 	dev = capi_devs_table[id - 1];
 	if (dev && !down_read_trylock(&dev->sem))
 		dev = NULL;
-	spin_unlock(&capi_devs_table_lock);
+	spin_unlock_bh(&capi_devs_table_lock);
 
 	return dev;
 }
