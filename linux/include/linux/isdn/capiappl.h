@@ -123,6 +123,13 @@ capi_set_signal(struct capi_appl* appl, capi_signal_func signal, unsigned long p
 }
 
 
+static inline void
+capi_unget_message(struct capi_appl* appl, struct sk_buff* msg)
+{
+	skb_queue_head(&appl->msg_queue, msg);
+}
+
+
 capinfo_0x10	capi_register		(struct capi_appl* appl);
 capinfo_0x11	capi_release		(struct capi_appl* appl);
 capinfo_0x11	capi_put_message	(struct capi_appl* appl, struct sk_buff* msg);
