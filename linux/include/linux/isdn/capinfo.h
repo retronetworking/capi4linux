@@ -33,7 +33,7 @@
 /**
  *	typedef capinfo_0x10_t - info class 0x10xx
  *
- *	Represents application registration errors.
+ *	Enumeration representing application registration errors.
  */
 typedef enum {
 	CAPINFO_0X10_NOERR			= 0x0000,
@@ -54,7 +54,7 @@ typedef enum {
 /**
  *	typedef capinfo_0x11_t - info class 0x11xx
  *
- *	Represents message exchange errors.
+ *	Enumeration representing message exchange errors.
  */
 typedef enum {
 	CAPINFO_0X11_NOERR			= 0x0000,

@@ -24,9 +24,9 @@
  *	struct capi_register_params - application parameters structure
  *	@level3cnt:	maximum number of logical connections the application
  *			can concurrently maintain
- *	@datablkcnt:	maximum number of received data blocks that can be
- *			reported to the application simultaneously for each
- *			logical connection
+ *	@datablkcnt:	maximum number of received data blocks (i.e., the
+ *			receive data window) that can be reported to the
+ *			application simultaneously for each logical connection
  *	@datablklen:	maximum size of the application data block to be
  *			transmitted and received
  */
@@ -79,7 +79,7 @@ typedef struct capi_version {
 
 /**
  *	struct capi_profile - device capabilities structure
- *	@ncontroller:	number of devices
+ *	@ncontroller:	number of installed devices
  *	@nbchannel:	number of B-Channels
  *	@goptions:	global options
  *	@support1:	B1 protocols
@@ -87,9 +87,6 @@ typedef struct capi_version {
  *	@support3:	B3 protocols
  *	@reserved:	reserved
  *	@manu:		manufacturer specific information
- *
- *	For more information about the individual bit-fields,
- *	see the CAPI standard.
  */
 typedef struct capi_profile {
 	__u16 ncontroller;

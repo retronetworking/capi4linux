@@ -59,14 +59,17 @@ typedef void	(*capi_signal_handler_t)	(struct capi_appl* appl, unsigned long par
 
 
 /**
- *	struct capi_appl - structure representing an application instance
- *	@id:		number
+ *	struct capi_appl - application control structure
+ *	@id:		application number
  *	@stats:		I/O statistics
  *	@params:	parameters
  *	@data:		private data
  *
- *	The application is responsible for updating the application
+ *	The application is responsible for updating the application's
  *	I/O statistics, and may freely use the @stats.lock.
+ *
+ *	More fields are present, but not documented, since they are
+ *	not part of the public interface.
  */
 struct capi_appl {
 	u16				id;
@@ -89,25 +92,24 @@ struct capi_appl {
 
 
 /**
- *	capi_set_signal - register a signal handler
+ *	capi_set_signal - install a signal handler
  *	@appl:		application
- *	@signal:	signal handler
+ *	@signal:	signal handler (in_irq() context)
  *	@param:		parameter to signal handler
  *
- *	The signal-handler informs the application about new messages, errors,
- *	or cleared queue-full/busy conditions.  The signal-handler is not
- *	meant to be a workhorse, but a mechanism for waking-up and scheduling
- *	applications.
+ *	The capicore ensures that by the time a call to the function
+ *	capi_release() returns for @appl, no thread is and will be executing
+ *	in a call from the capicore to @signal for @appl.
+ *
+ *	The signal handler informs the application of @appl about new messages,
+ *	errors, or cleared queue-full/busy conditions.  The signal handler is
+ *	not meant to be a workhorse, but just a mechanism for waking up and
+ *	scheduling applications.
  *
  *	The signal handler must be reentrant and will be called from in_irq()
- *	context.  Consequently, it should be as lightweight and fast as
- *	possible.
+ *	context; consequently, it should be as simple and fast as possible.
  *
- *	The capicore ensures that by the time the function capi_release()
- *	returns for @appl, no thread will be executing in a call from the
- *	capicore to @signal for @appl.
- *
- *	The application must provide a signal-handler, and must not
+ *	The application must install a signal handler for @appl, and must not
  *	reset it once registered.
  */
 static inline void
@@ -122,19 +124,21 @@ capi_set_signal(struct capi_appl* appl, capi_signal_handler_t signal, unsigned l
 
 
 /**
- *	capi_get_message - fetch message from an application queue
+ *	capi_get_message - fetch a message from an application queue
  *	@appl:		application
  *	@msg:		message
  *
  *	Context: !in_irq()
  *
+ *	Fetch a message from the message queue of @appl.  Upon successfully
+ *	fetching a message, %CAPINFO_0X11_NOERR is returned and a pointer to
+ *	the message is passed via @msg.  If there wasn't a message pending,
+ *	return immediately passing %CAPINFO_0X11_QUEUEEMPTY as return value.
+ *	Otherwise, a value indicating an error is returned.
+ *
  *	In the case of a data transfer message (DATA_B3_IND), the data is
  *	appended to the message (this is contrary to the CAPI standard which
- *	intends a shared buffer scheme) and the Data field is undefined.
- *
- *	Upon fetching a message successfully, %CAPINFO_0X11_NOERR is returned.
- *	If there was no message available, %CAPINFO_0X11_QUEUEEMPTY is
- *	returned.  Otherwise, a value indicating an error is returned.
+ *	intends a shared buffer scheme), and the Data field is undefined.
  */
 static inline capinfo_0x11_t
 capi_get_message(struct capi_appl* appl, struct sk_buff** msg)
@@ -149,14 +153,14 @@ capi_get_message(struct capi_appl* appl, struct sk_buff** msg)
 
 
 /**
- *	capi_unget_message - reinsert the message to an application queue
+ *	capi_unget_message - reinsert a message to an application queue
  *	@appl:		application
  *	@msg:		message
  *
  *	Context: !in_irq()
  *
- *	The message is placed at the head of the application queue, so that
- *	the message will be fetched next.
+ *	@msg is placed at the head of the message queue of @appl, so that
+ *	it will be fetched next.
  */
 static inline void
 capi_unget_message(struct capi_appl* appl, struct sk_buff* msg)
@@ -166,14 +170,14 @@ capi_unget_message(struct capi_appl* appl, struct sk_buff* msg)
 
 
 /**
- *	capi_peek_message - determine whether a message is available
+ *	capi_peek_message - check whether a message is pending
  *	@appl:		application
  *
  *	Context: !in_irq()
  *
- *	If a message is available, %CAPINFO_0X11_NOERR is returned.
- *	If there was no message, %CAPINFO_0X11_QUEUEEMPTY is returned.
- *	Otherwise, a value indicting an error is returned.
+ *	If a message is pending on the message queue of @appl,
+ *	%CAPINFO_0X11_NOERR is returned.  If not, %CAPINFO_0X11_QUEUEEMPTY
+ *	is returned.  Otherwise, a value indicating an error is returned.
  */
 static inline capinfo_0x11_t
 capi_peek_message(struct capi_appl* appl)

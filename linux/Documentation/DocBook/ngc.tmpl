@@ -21,8 +21,9 @@
 
     <revhistory>
       <revision>
-        <revnumber>$Revision$</revnumber>
-        <date>$Date$</date>
+        <revnumber></revnumber>
+        <date></date>
+        <revremark>Working Draft</revremark>
       </revision>
     </revhistory>
 
@@ -42,10 +43,9 @@
       </para>
 
       <para>
-        You should have received a copy of the GNU General Public License
-        along with this program; if not, write to the Free Software
-        Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA 02111-1307
-        USA
+        You should have received a copy of the GNU General Public License along
+        with this program; if not, write to the Free Software Foundation, Inc.,
+        59 Temple Place, Suite 330, Boston, MA 02111-1307 USA
       </para>
 
       <para>
@@ -61,43 +61,44 @@
     <title>Introduction</title>
 
     <para>
-      <acronym>CAPI</> (COMMON-ISDN-API) is a message oriented and event
-      driven programming interface used by applications to access
-      <acronym>ISDN</> hardware equipment in a standardized and
-      straightforward way.  Publisher of the <acronym>CAPI</> standard is the
-      <ulink url="http://www.capi.org">CAPI-Association</ulink>, a non-profit
+      <acronym>CAPI</> (COMMON-ISDN-API) is a message oriented and event driven
+      programming interface, used by applications to access <acronym>ISDN</>
+      hardware equipment in a standardized and straightforward way.  Publisher
+      of the <acronym>CAPI</> standard is the <ulink
+      url="http://www.capi.org">CAPI-Association</ulink>, a non-profit
       international consortium of hardware and software manufactures and
-      telecommunications institutions.  The <acronym>CAPI</> standard is
-      freely available for download on their website.
+      telecommunications institutions; the <acronym>CAPI</> standard is freely
+      available for download on their website.
     </para>
 
     <para>
-      The <acronym>CAPI</> standard defines a set of messages,
-      protocols, and operations.  While the messages and protocols are
-      interoperable, the interface to the operations is specific to
-      each supported operating-system.  For Linux, the standard
-      defines <acronym>CAPI</> interfaces for user- and kernel-space.
+      The <acronym>CAPI</> standard defines a set of messages, protocols, and
+      operations.  While the messages and protocols are interoperable, the
+      interface to the operations is specific to each supported
+      operating system.  For Linux, the standard defines <acronym>CAPI</>
+      interfaces for user and kernel space.
     </para>
 
     <para>
-      <ulink url="http://www.capi4linux.org/ngc"><emphasis>Next
-      Generation CAPI</emphasis></ulink> (<acronym>NGC</>) is an
-      <emphasis>experimental</emphasis> implementation of the
-      <acronym>CAPI 2.0</> standard, and it started as a fork of <ulink
-      url="http://www.isdn4linux.org">CAPI4Linux</ulink>.
+      <ulink url="http://www.capi4linux.org/ngc"><emphasis>Next Generation
+      CAPI</emphasis></ulink> (<acronym>NGC</>) is an
+      <emphasis>experimental</emphasis> implementation of the <acronym>CAPI</>
+      2.0 standard and derived from <ulink
+      url="http://www.capi4linux.org">CAPI4Linux</ulink>.
     </para>
 
     <para>
-      The heart of the <acronym>NGC</> subsystem is the
-      <emphasis>capicore</emphasis> and, as such, it is crucial to the
-      performance and the stability of the whole subsystem.  Basically, the
-      <emphasis>capicore</emphasis> provides an infrastructure for the
-      communication between applications and device-drivers.  Applications are
-      interfaced with the <emphasis>capicore</emphasis> via <acronym>CAPI</>,
-      and device-drivers via an interface proprietary to Linux.  This white
-      paper is related to these interfaces, and it is assumed that the reader
-      is familiar with the basic concepts and terms of the <acronym>CAPI</>
-      standard and with Linux kernel programming in general.
+      The heart of the <acronym>NGC</> subsystem is the capicore and, as such,
+      it is crucial to the performance and the stability of the whole
+      subsystem.  Basically, the capicore provides an infrastructure for the
+      communication between applications and device drivers.  Applications are
+      interfaced with the capicore via <acronym>CAPI</>, and device drivers via
+      a custom made interface proprietary to Linux.  This white paper is
+      concerned with these interfaces, and describes them from the viewpoint of
+      a device driver and an application developer, respectively.  Further, it
+      is assumed that the reader is familiar with the basic concepts and terms
+      of the <acronym>CAPI</> standard and with Linux kernel programming in
+      general.
     </para>
   </chapter>
 
@@ -105,9 +106,9 @@
     <title>Structures and Data Types</title>
 
     <para>
-      The <emphasis>capicore</emphasis> provides a set of common structures
-      and data types, forming the basis of communication between the various
-      layers of the <acronym>CAPI</> subsystem.
+      The capicore provides a common set of structures and data types forming
+      the basis of communication between the various layers of the
+      <acronym>NGC</> subsystem.
     </para>
 
 !Iinclude/linux/isdn/capinfo.h
@@ -120,64 +121,64 @@
     <title>Device Driver Interface</title>
 
     <para>
-      Device-drivers and applications communicate together via the
-      <emphasis>capicore</emphasis> in an asynchronous way by exchanging
-      messages according to the <acronym>CAPI</> standard.  While the
-      implementation of a device-driver might be rather complex internally,
-      the interface with the <emphasis>capicore</emphasis> is simple.  The
-      declarations to this interface can be found in <filename
-      class="headerfile">linux/isdn/capidevice.h</filename>.
+      Device drivers and applications communicate together, via the capicore,
+      in an asynchronous way by exchanging messages according to the
+      <acronym>CAPI</> standard.  While the implementation of a device driver
+      might be rather complex internally, the interface with the capicore is
+      pretty simple.  The declarations to this interface can be found in
+      <filename class="headerfile">linux/isdn/capidevice.h</filename>.
     </para>
 
     <sect1>
       <title>Overview</title>
 
       <para>
-        Devices are represented to the <emphasis>capicore</emphasis> by
-        objects of the generic <structname>capi_device</structname> structure.
-        This structure forms the basis of communication between the
-        <emphasis>capicore</emphasis> and device-drivers.  Devices are
-        reference counted objects and need to be dynamically allocated by the
-        device-driver via the function <function>capi_device_alloc</function>.
-        When the device-driver is done with the device (i.e.: after removing
-        the device from the <emphasis>capicore</emphasis>), it should drop its
-        reference to it via the function <function>capi_device_put</function>.
+        Devices are represented to the capicore by objects of the generic
+        <structname>capi_device</structname> structure.  This structure forms
+        the basis of communication between the capicore and device drivers.
+        Devices are reference counted objects and need to be dynamically
+        allocated by the device driver via the function
+        <function>capi_device_alloc</function>.  Destroying a device is
+        done by releasing all references to it via the function
+        <function>capi_device_put</function>.
       </para>
 
       <para>
         Once a generic <structname>capi_device</structname> object is
-        initialized, the device-driver can register it with the
-        <emphasis>capicore</emphasis> via the function
-        <function>capi_device_register</function>.  Removing the device from
-        the <emphasis>capicore</emphasis> is done via the function
-        <function>capi_device_unregister</function>.
+        initialized, the device driver can register it with the capicore via
+        the function <function>capi_device_register</function>.  Removing the
+        device from the capicore is done via the function
+        <function>capi_device_unregister</function>; subsequently, the
+        device driver can release the device via the function
+        <function>capi_device_put</function>.
       </para>
 
       <para>
-        The device-driver has to provide three functions for calling by the
-        <emphasis>capicore</emphasis> via the
-        <structname>capi_driver</structname> structure.  This enables the
-        <emphasis>capicore</emphasis> to register and remove applications with
-        devices, and transfering messages to them.
+        The device driver has to provide three functions for calling by the
+        capicore via the <structname>capi_driver</structname> structure,
+        enabling the registration and removal of applications with the device
+        driver's devices and the transfer of messages to them.
       </para>
 
       <para>
-        Each application owns a message queue by which devices are
-        transferring messages to the application.  Adding messages to the
-        application queue is done via the function
-        <function>capi_appl_enqueue_message</function>, and informing the
-        application about new messages via the function
-        <function>capi_appl_signal</function>.  If the device-driver
-        encounters an error concerning the message exchange, it should inform
-        the corresponding application about this event via the function
-        <function>capi_appl_signal_error</function>.
+        Each application owns a message queue by which devices are transferring
+        messages to the application.  Adding messages to the application queue
+        is done via the function
+        <function>capi_appl_enqueue_message</function>.  Upon that, the device
+        driver should <emphasis>wakeup</emphasis> the application via the
+        function <function>capi_appl_signal</function>.  If the device driver
+        encounters an error related to a message (i.e., in the context of an
+        application), it should inform the concerned application about that
+        condition via the function <function>capi_appl_signal_error</function>,
+        causing the application to release.
       </para>
 
       <para>
         Besides that, since <acronym>CAPI</> devices are <emphasis>class
-        devices</emphasis>, they can easily export own attributes to the
-        <emphasis>sysfs</emphasis>.  See <filename
-        class="headerfile">linux/device.h</filename> for more information.
+        devices</emphasis>, they can easily export own attributes to the sysfs,
+        enabling the device driver to offer device specific features to the
+        user.  See <filename class="headerfile">linux/device.h</filename> for
+        more information.
       </para>
     </sect1>
 
@@ -193,19 +194,19 @@
     <title>Application Interface</title>
 
     <para>
-      Applications and device-drivers communicate together via the
-      <emphasis>capicore</emphasis> in an asynchronous way by exchanging
-      messages according to the <acronym>CAPI</> standard.  While the
-      implementation of an application might be rather complex internally, the
-      interface with the <emphasis>capicore</emphasis> is simple.
+      Applications and device drivers communicate together, via the capicore,
+      in an asynchronous way by exchanging messages according to the
+      <acronym>CAPI</> standard.  While the implementation of an application
+      might be rather complex internally, the interface with the capicore is
+      pretty simple.
     </para>
 
     <para>
-      For Linux, the <acronym>CAPI</> standard defines interfaces for user-
-      and kernel-space applications.  Unfortunately, the specification to the
-      kernel-space <acronym>CAPI</> is too unspecific.  To give developers the
-      required backing in writing safe kernel-space applications, the
-      <emphasis>capicore</emphasis> introduces an alternative interface which
+      For Linux, the <acronym>CAPI</> standard defines <acronym>CAPI</>
+      interfaces for user and kernel space applications.  Unfortunately, the
+      specification to the kernel space <acronym>CAPI</> is too unspecific.  To
+      give developers the required backing in writing safe kernel space
+      applications, the capicore introduces an alternative interface which
       we're going to describe here in detail.  The declarations to this
       interface can be found in <filename
       class="headerfile">linux/isdn/capiappl.h</filename>.
@@ -215,21 +216,23 @@
       <title>Overview</title>
 
       <para>
-        Applications are represented to the <emphasis>capicore</emphasis> by
-        objects of the generic <structname>capi_appl</structname> structure.
-        This structure forms the basis of communication between the
-        <emphasis>capicore</emphasis> and applications.  Once a generic
-        <structname>capi_appl</structname> object is initialized, the
-        application can register it with the <emphasis>capicore</emphasis> via
-        the function <function>capi_register</function>.  Removing
-        applications from the <emphasis>capicore</emphasis> is done via the
-        function <function>capi_release</function>.
+        Applications are represented to the capicore by objects of the generic
+        <structname>capi_appl</structname> structure.  This structure forms the
+        basis of communication between the capicore and applications.
       </para>
 
       <para>
-        Applications need to register a signal-handler via the function
-	<function>capi_set_signal</function>.  The signal-handler serves as a
-	notification mechanism for asynchronous events such as:
+        Once a generic <structname>capi_appl</structname> object is
+        initialized, the application can register it with the capicore via the
+        function <function>capi_register</function>.  Removing an application
+        from the capicore is done via the function
+        <function>capi_release</function>.
+      </para>
+
+      <para>
+        Applications need to install a signal handler via the function
+	<function>capi_set_signal</function>.  The signal handler serves as a
+	notification mechanism for asynchronous events, such as:
 
         <itemizedlist mark=opencircle>
           <listitem>
@@ -239,19 +242,40 @@
             <para>the clearance of queue-full/busy conditions</para>
           </listitem>
           <listitem>
-            <para>occurred message exchange errors</para>
+            <para>errors</para>
           </listitem>
         </itemizedlist>
 
-        The signal-handler is not meant to be a
-        <emphasis>workhorse</emphasis>, but a mechanism for waking-up and
+        Note that a signal handler is not meant to be a
+        <emphasis>workhorse</emphasis>, but just a mechanism for waking up and
         scheduling applications.
       </para>
 
       <para>
         Applications transfer messages via the function
         <function>capi_put_message</function>, and fetch them via the function
-        <function>capi_get_message</function>.
+        <function>capi_get_message</function>.  They can put back messages via
+        the function <function>capi_unget_message</function>, and check for
+        pending messages via the function
+        <function>capi_peek_message</function>.
+      </para>
+
+      <para>
+        Applications can retrieve informations from <acronym>CAPI</> devices
+        via the functions: <function>capi_get_manufacturer</function>,
+        <function>capi_get_serial_number</function>,
+        <function>capi_get_version</function>,
+        <function>capi_get_profile</function>, and
+        <function>capi_get_product</function>.
+      </para>
+
+      <para>
+        Since <acronym>CAPI</> devices are <emphasis>class devices</emphasis>,
+        applications can install a <emphasis>class interface</emphasis> with
+        the Linux device driver core to get informed when <acronym>CAPI</>
+        devices are being registered and removed with the capicore.  See
+        <filename class="headerfile">linux/device.h</filename> for more
+        information.
       </para>
     </sect1>
 

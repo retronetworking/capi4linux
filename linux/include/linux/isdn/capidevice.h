@@ -41,28 +41,33 @@ struct capi_device;
 
 /**
  *	struct capi_driver - device operations structure
- *	@capi_register:		register an application
- *	@capi_release:		remove an application
- *	@capi_put_message:	transfer a message
+ *	@capi_register:		callback function registering an application
+ *	@capi_release:		callback function removing an application
+ *	@capi_put_message:	callback function transferring a message
  *
- *	The device-driver must provide three functions for calling by the
- *	capicore.  This enables the capicore to register and remove
- *	applications with devices, and transferring messages to them.
+ *	The device driver must provide three functions for calling by the
+ *	capicore via this structure, enabling the registration and removal of
+ *	applications with the device driver's devices and the transfer of
+ *	messages to them.
  *
- *	The device-driver must ensure that by the time @capi_release returns
- *	for an application, no thread will be executing in a call from the
- *	device-driver to any of the functions capi_appl_enqueue_message(),
- *	capi_appl_signal(), or capi_appl_signal_error() for that application.
+ *	The device driver must ensure that by the time a call to the callback
+ *	function @capi_release returns, no thread is and will be executing,
+ *	in the context of @dev, in a call to any of these functions
+ *	capi_appl_signal_error(), capi_appl_enqueue_message(), or
+ *	capi_appl_signal() for @appl.
  *
- *	If @capi_put_message can not accept messages due to flow-control or
- *	busy reasons, it has the option of rejecting the message by either
- *	returning %CAPINFO_0X11_QUEUEFULL or %CAPINFO_0X11_BUSY, respectively.
- *	In this case, the device-driver should call capi_appl_signal() at a
- *	later time, when it can accept messages again.
+ *	The device driver has the option of rejecting @msg by either returning
+ *	%CAPINFO_0X11_QUEUEFULL or %CAPINFO_0X11_BUSY from the callback function
+ *	@capi_put_message.  In this case, @appl could block waiting for the
+ *	clearance of the pending condition, and the device driver must call the
+ *	function capi_appl_signal() for @appl either when the device driver can
+ *	accept messages again for @dev or when the device driver has enqueued
+ *	any message for @appl, whichever happens first.
  *
- *	While @capi_register and @capi_release are called from process context
- *	and may block, @capi_put_message is called from bottom-half context and
- *	may not block.  All three functions must be reentrant.
+ *	While the callback functions @capi_register and @capi_release are called
+ *	from process context and may block (but mustn't be slow, i.e., blocking
+ *	indefinitely), @capi_put_message is called from bottom half context and
+ *	must not block.  All three callback functions must be reentrant.
  */
 struct capi_driver {
 	capinfo_0x10_t	(*capi_register)	(struct capi_device* dev, struct capi_appl* appl);
@@ -72,9 +77,9 @@ struct capi_driver {
 
 
 /**
- *	struct capi_device - structure representing a device instance
- *	@id:		number
- *	@product:	name
+ *	struct capi_device - device control structure
+ *	@id:		device number
+ *	@product:	device name
  *	@manufacturer:	manufacturer
  *	@serial:	serial number
  *	@version:	version
@@ -83,8 +88,11 @@ struct capi_driver {
  *	@stats:		I/O statistics
  *	@class_dev:	class device
  *
- *	The device-driver is responsible for updating the device
+ *	The device driver is responsible for updating the device's
  *	I/O statistics, and may freely use the @stats.lock.
+ *
+ *	More fields are present, but not documented, since they are
+ *	not part of the public interface.
  */
 struct capi_device {
 	unsigned short		id;
@@ -112,10 +120,13 @@ void			capi_device_unregister	(struct capi_device* dev);
 
 
 /**
- *	capi_device_get - increment the reference counter for a device
+ *	capi_device_get - get another reference to a device
  *	@dev:		device
  *
  *	Context: !in_irq()
+ *
+ *	Get another reference to @dev by incrementing its reference counter
+ *	by one.  Return @dev.
  */
 static inline struct capi_device*
 capi_device_get(struct capi_device* dev)
@@ -130,13 +141,13 @@ capi_device_get(struct capi_device* dev)
 
 
 /**
- *	capi_device_put - decrement the reference counter for a device
+ *	capi_device_put - release a reference to a device
  *	@dev:		device
  *
  *	Context: !in_irq()
  *
- *	Decrement the reference counter for device, and if zero, free the
- *	device structure.
+ *	Release a reference to @dev by decrementing its reference counter
+ *	by one and, if zero, free @dev.
  */
 static inline void
 capi_device_put(struct capi_device* dev)
@@ -146,7 +157,7 @@ capi_device_put(struct capi_device* dev)
 
 
 /**
- *	capi_device_set_devdata - set the private data pointer
+ *	capi_device_set_devdata - set private data pointer
  *	@dev:		device
  *	@data:		private data
  */
@@ -158,7 +169,7 @@ capi_device_set_devdata(struct capi_device* dev, void* data)
 
 
 /**
- *	capi_device_get_devdata - return the private data pointer
+ *	capi_device_get_devdata - return private data pointer
  *	@dev:		device
  */
 static inline void*
@@ -169,7 +180,7 @@ capi_device_get_devdata(struct capi_device* dev)
 
 
 /**
- *	capi_device_set_dev - set the device pointer
+ *	capi_device_set_dev - set generic device pointer
  *	@capi_dev:	device
  *	@dev:		device
  */
@@ -181,7 +192,7 @@ capi_device_set_dev(struct capi_device* capi_dev, struct device* dev)
 
 
 /**
- *	capi_device_get_dev - return the device pointer
+ *	capi_device_get_dev - return generic device pointer
  *	@capi_dev:	device
  */
 static inline struct device*
@@ -192,7 +203,7 @@ capi_device_get_dev(const struct capi_device* capi_dev)
 
 
 /**
- *	to_capi_device - cast to device structure
+ *	to_capi_device - downcast to generic CAPI device control structure
  *	@cd:		class device
  */
 static inline struct capi_device*
@@ -204,37 +215,22 @@ extern struct class capi_class;
 
 
 /**
- *	capi_appl_signal - wakeup an application
- *	@appl:		application
- *
- *	Context: in_irq()
- *
- *	The device-driver should wakeup the application after either
- *	enqueuing messages, or clearing a queue-fulf/busy condition.
- *	The device-driver may batch messages.
- */
-static inline void
-capi_appl_signal(struct capi_appl* appl)
-{
-	appl->sig(appl, appl->sig_param);
-}
-
-
-/**
- *	capi_appl_enqueue_message - add a message to the application queue
+ *	capi_appl_enqueue_message - add a message to an application queue
  *	@appl:		application
  *	@msg:		message
  *
  *	Context: in_irq()
  *
- *	The application queue has unbounded capacity, and the device-driver
- *	must adhere to the CAPI data window protocol in order to prevent the
- *	queue from growing immensely.  If the device-driver needs to drop a
- *	messages, it should signal this event to the corresponding application.
+ *	The message queue of @appl has unbounded capacity; hence the device
+ *	driver must adhere to the CAPI data window protocol to prevent that
+ *	queue from growing immensely.  A full data window should cause the
+ *	device driver to trigger flow control on the line, if supported by
+ *	the line protocol; otherwise, the device driver should drop @msg and
+ *	notify @appl about that condition.
  *
  *	In the case of a data transfer message (DATA_B3_IND), the data must be
  *	appended to the message (this is contrary to the CAPI standard which
- *	intends a shared buffer scheme) and the Data field will be ignored.
+ *	intends a shared buffer scheme), and the Data field will be ignored.
  */
 static inline void
 capi_appl_enqueue_message(struct capi_appl* appl, struct sk_buff* msg)
@@ -244,15 +240,29 @@ capi_appl_enqueue_message(struct capi_appl* appl, struct sk_buff* msg)
 
 
 /**
- *	capi_appl_signal_error - inform an application about an error
+ *	capi_appl_signal - wakeup an application
+ *	@appl:		application
+ *
+ *	Context: in_irq()
+ *
+ *	@appl should be woken up either after enqueuing messages or clearing a
+ *	queue-full/busy condition on @appl, respectively.
+ */
+static inline void
+capi_appl_signal(struct capi_appl* appl)
+{
+	appl->sig(appl, appl->sig_param);
+}
+
+
+/**
+ *	capi_appl_signal_error - signal an error to an application
  *	@appl:		application
  *	@info:		error
  *
  *	Context: in_irq()
  *
- *	Signal a non-recoverable message exchange error to the application.
- *	This usually implies that messages have been lost, and the only recovery
- *	for the application is to do a release.
+ *	The only recovery for @appl, from this condition, is to do a release.
  */
 static inline void
 capi_appl_signal_error(struct capi_appl* appl, capinfo_0x11_t info)
