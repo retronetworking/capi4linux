@@ -318,7 +318,11 @@ static struct class_interface kernelcapi_iface = {
 static int __init
 kernelcapi_init(void)
 {
-	return class_interface_register(&kernelcapi_iface);
+	int res = class_interface_register(&kernelcapi_iface);
+	if (unlikely(!res))
+		pr_info("kernelcapi: $Revision$\n");
+
+	return res;
 }
 
 
@@ -326,6 +330,8 @@ static void __exit
 kernelcapi_exit(void)
 {
 	class_interface_unregister(&kernelcapi_iface);
+
+	pr_info("kernelcapi: unload\n");
 }
 
 
