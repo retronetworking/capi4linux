@@ -61,7 +61,7 @@ struct capi_device {
 		CAPI_DEVICE_STATE_ZOMBIE
 	};
 	enum capi_device_state	state;
-	spinlock_t		lock;
+	spinlock_t		state_lock;
 
 	atomic_t		appls;
 
