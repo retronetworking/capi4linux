@@ -28,7 +28,7 @@
 
 
 static struct capi_device* capi_devices_table[CAPI_MAX_DEVS];
-static spinlock_t capi_devices_table_lock;
+static spinlock_t capi_devices_table_lock = SPIN_LOCK_UNLOCKED;
 atomic_t nr_capi_devices = ATOMIC_INIT(0);
 
 
@@ -156,7 +156,7 @@ capi_device_unregister(struct capi_device* dev)
 
 
 static unsigned long __capi_appl_ids[BITS_TO_LONGS(CAPI_MAX_APPLS)];
-static spinlock_t __capi_appl_ids_lock;
+static spinlock_t __capi_appl_ids_lock = SPIN_LOCK_UNLOCKED;
 
 
 static inline int
@@ -181,8 +181,7 @@ alloc_capi_appl_id(struct capi_appl* appl)
 static inline void
 release_capi_appl_id(struct capi_appl* appl)
 {
-	if (likely(appl->id))
-		__clear_bit(appl->id - 1, __capi_appl_ids);
+	__clear_bit(appl->id - 1, __capi_appl_ids);
 }
 
 
@@ -204,8 +203,8 @@ capi_register(struct capi_appl* appl)
 
 	skb_queue_head_init(&appl->msg_queue);
 	appl->info = CAPINFO_0X11_NOERR;
-	spin_lock_init(&appl->stats.lock);
 	memset(&appl->stats, 0, sizeof appl->stats);
+	spin_lock_init(&appl->stats.lock);
 	memset(&appl->devs, 0, sizeof appl->devs);
 
 	spin_lock(&capi_devices_table_lock);
@@ -304,7 +303,7 @@ capi_peek_message(struct capi_appl* appl)
 {
 	if (unlikely(appl->info))
 		return appl->info;
-	
+
 	if (!skb_queue_empty(&appl->msg_queue))
 		return CAPINFO_0X11_QUEUEFULL;
 
@@ -341,38 +340,34 @@ try_get_capi_device_by_id(int id)
 u8*
 capi_get_manufacturer(int id, u8 manufacturer[CAPI_MANUFACTURER_LEN])
 {
-	u8* res = manufacturer;
-
 	if (id) {
 		struct capi_device* dev = try_get_capi_device_by_id(id);
-		if (dev)
-			memcpy(manufacturer, dev->manufacturer, CAPI_MANUFACTURER_LEN);
-		else
-			res = NULL;
+		if (!dev)
+			return NULL;
+
+		memcpy(manufacturer, dev->manufacturer, CAPI_MANUFACTURER_LEN);
 		put_capi_device(dev);
 	} else
 		strlcpy(manufacturer, "NGC4Linux", CAPI_MANUFACTURER_LEN);
 
-	return res;
+	return manufacturer;
 }
 
 
 u8*
 capi_get_serial(int id, u8 serial[CAPI_SERIAL_LEN])
 {
-	u8* res = serial;
-
 	if (id) {
 		struct capi_device* dev = try_get_capi_device_by_id(id);
-		if (dev)
-			memcpy(serial, dev->serial, CAPI_SERIAL_LEN);
-		else
-			res = NULL;
+		if (!dev)
+			return NULL;
+
+		memcpy(serial, dev->serial, CAPI_SERIAL_LEN);
 		put_capi_device(dev);
 	} else
 		strlcpy(serial, "0", CAPI_SERIAL_LEN);
 
-	return res;
+	return serial;
 }
 
 
@@ -383,10 +378,10 @@ capi_get_version(int id, struct capi_version* version)
 
 	if (id) {
 		struct capi_device* dev = try_get_capi_device_by_id(id);
-		if (dev)
-			*version = dev->version;
-		else
-			version = NULL;
+		if (!dev)
+			return NULL;
+
+		*version = dev->version;
 		put_capi_device(dev);
 	} else
 		*version = capicore_version;
@@ -398,20 +393,18 @@ capi_get_version(int id, struct capi_version* version)
 capinfo_0x11
 capi_get_profile(int id, struct capi_profile* profile)
 {
-	capinfo_0x11 info = CAPINFO_0X11_NOERR;
-
 	if (id) {
 		struct capi_device* dev = try_get_capi_device_by_id(id);
-		if (dev) {
-			*profile = dev->profile;
-			profile->ncontroller = atomic_read(&nr_capi_devices);
-		} else
-			info = CAPINFO_0X11_OSRESERR;
+		if (!dev)
+			return CAPINFO_0X11_OSRESERR;
+
+		*profile = dev->profile;
+		profile->ncontroller = atomic_read(&nr_capi_devices);
 		put_capi_device(dev);
 	} else
 		profile->ncontroller = atomic_read(&nr_capi_devices);
 
-	return info;
+	return	CAPINFO_0X11_NOERR;
 }
 
 
