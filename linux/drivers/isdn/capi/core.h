@@ -40,7 +40,6 @@ void	release_capi_device		(struct class_device* cd);
 static inline int nr_capi_devices(void)
 {
 	extern int __nr_capi_devices;
-	read_barrier_depends();
 	return __nr_capi_devices;
 }
 
