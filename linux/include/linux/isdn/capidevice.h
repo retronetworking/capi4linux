@@ -19,8 +19,8 @@
  */
 
 
-#ifndef CAPIDEVICE_H
-#define CAPIDEVICE_H
+#ifndef _CAPIDEVICE_H
+#define _CAPIDEVICE_H
 
 
 #ifdef __KERNEL__
@@ -111,7 +111,7 @@ capi_device_set_dev(struct capi_device* capi_dev, struct device* dev)
 
 
 static inline struct device*
-capi_device_get_dev(struct capi_device* capi_dev)
+capi_device_get_dev(const struct capi_device* capi_dev)
 {
 	return capi_dev->class_dev.dev;
 }
@@ -148,4 +148,4 @@ capi_appl_signal_error(struct capi_appl* appl, capinfo_0x11 info)
 #endif	/* __KERNEL__ */
 
 
-#endif	/* CAPIDEVICE_H */
+#endif	/* _CAPIDEVICE_H */
