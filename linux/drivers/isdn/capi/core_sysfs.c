@@ -29,7 +29,7 @@ void	free_capi_device	(struct class_device* cd);
 static ssize_t
 show_manufacturer(struct class_device* cd, char* buf)
 {
-	return snprintf(buf, CAPI_MANUFACTURER_LEN, "%s", to_capi_device(cd)->manufacturer);
+	return snprintf(buf, CAPI_MANUFACTURER_LEN, "%s\n", to_capi_device(cd)->manufacturer);
 }
 CLASS_DEVICE_ATTR(manufacturer, S_IRUGO, show_manufacturer, NULL);
 
@@ -37,7 +37,7 @@ CLASS_DEVICE_ATTR(manufacturer, S_IRUGO, show_manufacturer, NULL);
 static ssize_t
 show_serial_number(struct class_device* cd, char* buf)
 {
-	return snprintf(buf, CAPI_SERIAL_LEN, "%s", to_capi_device(cd)->serial);
+	return snprintf(buf, CAPI_SERIAL_LEN, "%s\n", to_capi_device(cd)->serial);
 }
 CLASS_DEVICE_ATTR(serial_number, S_IRUGO, show_serial_number, NULL);
 
@@ -47,7 +47,7 @@ show_version(struct class_device* cd, char* buf)
 {
 	struct capi_version* v = &to_capi_device(cd)->version;
 
-	return sprintf(buf, "%d.%d", v->majormanuversion, v->minormanuversion);
+	return sprintf(buf, "%d.%d\n", v->majormanuversion, v->minormanuversion);
 }
 CLASS_DEVICE_ATTR(version, S_IRUGO, show_version, NULL);
 
@@ -75,7 +75,7 @@ static struct class_device_attribute* attrs[] = {
 static ssize_t								\
 show_##name(struct class_device* cd, char* buf)				\
 {									\
-	return sprintf(buf, "%lu", to_capi_device(cd)->stats.name);	\
+	return sprintf(buf, "%lu\n", to_capi_device(cd)->stats.name);	\
 }									\
 static CLASS_DEVICE_ATTR(name, S_IRUGO, show_##name, NULL)
 
